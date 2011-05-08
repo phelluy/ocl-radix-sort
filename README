@@ -1,0 +1,36 @@
+C++ class for sorting integer lists in OpenCL
+
+1) License
+
+copyright Philippe Helluy, Université de Strasbourg, France, 2011, helluy@math.unistra.fr
+licensed under the GNU Lesser General Public License see http://www.gnu.org/copyleft/lesser.html
+if you find this software usefull you can cite the following work in your reports or articles:
+Philippe HELLUY, A portable implementation of the radix sort algorithm in OpenCL, HAL 2011.
+
+2) Short description
+
+The algorithm is the radix sort algorithm
+Marcho Zagha and Guy E. Blelloch. “Radix Sort For Vector Multiprocessor.”
+in: Conference on High Performance Networking and Computing, pp. 712-721, 1991.
+
+Each integer is made of _TOTALBITS bits. The radix is made of _BITS bits. The sort is made of
+several passes, each consisting in sorting against a group of bits corresponding to the radix.
+_TOTALBITS/_BITS passes are needed.
+
+
+3) Installing
+
+The software is made of a C++ class and a exemple given in CLRadixSortMain.cpp
+No library needed but a working OpenCL library and g++ 
+
+The sorting parameters can be changed in "CLRadixSortParam.hpp"
+
+compilation for Mac:
+g++ CLRadixSort.cpp CLRadixSortMain.cpp -framework opencl -Wall
+
+compilation for Linux:
+g++ CLRadixSort.cpp CLRadixSortMain.cpp -lOpenCL -Wall
+
+Tested (may 2011) on Mac, Linux with AMD GPU/CPU and NVIDIA GPU.
+
+Not tested on Intel under Windows.

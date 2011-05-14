@@ -193,7 +193,7 @@ int main(void){
 
   // sort
 
-  rs.nkeys=9;
+  //rs.nkeys=9;
   rs.Sort();
 
   rs.RecupGPU();

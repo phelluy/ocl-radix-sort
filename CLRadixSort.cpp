@@ -233,9 +233,9 @@ void CLRadixSort::Resize(int nn){
   int reste=nkeys % (_GROUPS * _ITEMS);
   nkeys_rounded=nkeys;
   cl_int err;
-  int pad[_GROUPS * _ITEMS];
+  unsigned int pad[_GROUPS * _ITEMS];
   for(int ii=0;ii<_GROUPS * _ITEMS;ii++){
-    pad[ii]=_MAXINT-1;
+    pad[ii]=_MAXINT-(unsigned int)1;
   }
   if (reste !=0) {
     nkeys_rounded=nkeys-reste+(_GROUPS * _ITEMS);

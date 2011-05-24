@@ -11,6 +11,7 @@
 
 using namespace std; 
 
+
 CLRadixSort::CLRadixSort(cl_context GPUContext,
 			 cl_device_id dev,
 			 cl_command_queue CommandQue) :
@@ -20,6 +21,7 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
   nkeys(_N)
 {
 
+  nkeys_rounded=nkeys;
   // check some conditions
   assert(_TOTALBITS % _BITS == 0);
   assert(_N % (_GROUPS * _ITEMS) == 0);
@@ -31,6 +33,7 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
   histo_time=0;
   scan_time=0;
   reorder_time=0;
+  transpose_time=0;
   
   //read the program
   string prog;   // program
@@ -94,6 +97,8 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
   assert(err == CL_SUCCESS);
   ckReorder = clCreateKernel(Program, "reorder", &err);
   assert(err == CL_SUCCESS);
+  ckTranspose = clCreateKernel(Program, "transpose", &err);
+  assert(err == CL_SUCCESS);
    
 
   cout << "Construct the random list"<<endl;
@@ -101,13 +106,13 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
   uint maxint=_MAXINT;
   assert(_MAXINT != 0);
   for(uint i = 0; i < _N; i++){
-    h_Keys[index(i)] = ((rand())% maxint);
-    h_checkKeys[index(i)]=h_Keys[index(i)];
+    h_Keys[i] = ((rand())% maxint);
+    h_checkKeys[i]=h_Keys[i];
   }
 
   // construction of the initial permutation
   for(uint i = 0; i < _N; i++){
-    h_Permut[index(i)] = i;
+    h_Permut[i] = i;
   }
 
   cout << "Send to the GPU"<<endl;
@@ -182,6 +187,8 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
 			   &err);
   assert(err == CL_SUCCESS);
 
+  Resize(nkeys);
+
 
   // we set here the fixed arguments of the OpenCL kernels
   // the changing arguments are modified elsewhere in the class
@@ -212,32 +219,166 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
 
 }
 
-// global sorting algorithm
+// resize the sorted vector
+void CLRadixSort::Resize(int nn){
 
-void CLRadixSort::Sort(){
+  assert(nn <= _N);
 
-  cout << "Start storting "<<nkeys<< " keys"<<endl;
+  if (VERBOSE){
+    cout << "Resize to  "<<nn<<endl;
+  }
+  nkeys=nn;
 
-  // length of the vector has to be dividible by (_GROUPS * _ITEMS)
+  // length of the vector has to be divisible by (_GROUPS * _ITEMS)
   int reste=nkeys % (_GROUPS * _ITEMS);
-  int nold=nkeys;
+  nkeys_rounded=nkeys;
   cl_int err;
   int pad[_GROUPS * _ITEMS];
   for(int ii=0;ii<_GROUPS * _ITEMS;ii++){
     pad[ii]=_MAXINT-1;
   }
   if (reste !=0) {
-    nkeys=nkeys-reste+(_GROUPS * _ITEMS);
+    nkeys_rounded=nkeys-reste+(_GROUPS * _ITEMS);
     // pad the vector with big values
+    assert(nkeys_rounded <= _N);
     err = clEnqueueWriteBuffer(CommandQueue,
 			       d_inKeys,
-			       CL_TRUE, sizeof(uint)*nold,
+			       CL_TRUE, sizeof(uint)*nkeys,
 			       sizeof(uint) *(_GROUPS * _ITEMS - reste) ,
 			       pad,
 			       0, NULL, NULL);
+    //cout << nkeys<<" "<<nkeys_rounded<<endl;
     assert(err == CL_SUCCESS);   
   }
 
+}
+
+// transpose the list for faster memory access
+void CLRadixSort::Transpose(int nbrow,int nbcol){
+
+// __kernel void transpose(const __global int* invect,
+// 			__global int* outvect,
+// 			const int nbcol,
+// 			const int nbrow,
+// 			const __global int* inperm,
+// 			__global int* outperm){
+
+
+  cl_int err;
+
+  err  = clSetKernelArg(ckTranspose, 0, sizeof(cl_mem), &d_inKeys);
+  assert(err == CL_SUCCESS);
+
+  err  = clSetKernelArg(ckTranspose, 1, sizeof(cl_mem), &d_outKeys);
+  assert(err == CL_SUCCESS);
+
+  err = clSetKernelArg(ckTranspose, 2, sizeof(uint), &nbcol);
+  assert(err == CL_SUCCESS);
+
+  err = clSetKernelArg(ckTranspose, 3, sizeof(uint), &nbrow);
+  assert(err == CL_SUCCESS);
+
+  err  = clSetKernelArg(ckTranspose, 4, sizeof(cl_mem), &d_inPermut);
+  assert(err == CL_SUCCESS);
+
+  err  = clSetKernelArg(ckTranspose, 5, sizeof(cl_mem), &d_outPermut);
+  assert(err == CL_SUCCESS);
+
+  err  = clSetKernelArg(ckTranspose, 6, sizeof(uint)*_GROUPS*_GROUPS, NULL);
+  assert(err == CL_SUCCESS);
+
+  err  = clSetKernelArg(ckTranspose, 7, sizeof(uint)*_GROUPS*_GROUPS, NULL);
+  assert(err == CL_SUCCESS);
+
+  // err  = clSetKernelArg(ckScanHistogram, 1,
+  // 			sizeof(uint)* maxmemcache ,
+  // 			NULL); // mem cache
+
+
+  cl_event eve;
+
+  size_t global_work_size[2];
+  size_t local_work_size[2];
+
+  assert(nbrow%_GROUPS == 0);
+  assert(nbcol%_GROUPS == 0);
+
+  global_work_size[0]=nbrow/_GROUPS;
+  global_work_size[1]=nbcol;
+
+  local_work_size[0]=1;
+  local_work_size[1]=_GROUPS;
+
+
+  err = clEnqueueNDRangeKernel(CommandQueue,
+			       ckTranspose,
+			       2,   // two dimensions: rows and columns
+ 			       NULL,
+			       global_work_size,
+			       local_work_size,
+			       0, NULL, &eve);
+
+  //exchange the pointers
+
+  // swap the old and new vectors of keys
+  cl_mem d_temp;
+  d_temp=d_inKeys;
+  d_inKeys=d_outKeys;
+  d_outKeys=d_temp;
+
+  // swap the old and new permutations
+  d_temp=d_inPermut;
+  d_inPermut=d_outPermut;
+  d_outPermut=d_temp;
+
+
+  // timing
+  clFinish(CommandQueue);
+
+  cl_ulong debut,fin;
+
+  err=clGetEventProfilingInfo (eve,
+			   CL_PROFILING_COMMAND_QUEUED,
+			   sizeof(cl_ulong),
+			       (void*) &debut,
+			   NULL);
+  //cout << err<<" , "<<CL_PROFILING_INFO_NOT_AVAILABLE<<endl;
+  assert(err== CL_SUCCESS);
+
+  err=clGetEventProfilingInfo (eve,
+			   CL_PROFILING_COMMAND_END,
+			   sizeof(cl_ulong),
+			       (void*) &fin,
+			   NULL);
+  assert(err== CL_SUCCESS);
+
+  transpose_time += (float) (fin-debut)/1e9;
+
+
+
+
+
+}
+
+// global sorting algorithm
+
+void CLRadixSort::Sort(){
+
+  assert(nkeys_rounded <= _N);
+  assert(nkeys <= nkeys_rounded);
+  int nbcol=nkeys_rounded/(_GROUPS * _ITEMS);
+  int nbrow= _GROUPS * _ITEMS;
+
+  if (VERBOSE){
+    cout << "Start storting "<<nkeys<< " keys"<<endl;
+  }
+
+  if (TRANSPOSE){
+    if (VERBOSE) {
+      cout << "Transpose"<<endl;
+    }
+    Transpose(nbrow,nbcol);
+  }
 
   for(uint pass=0;pass<_PASS;pass++){
     //for(uint pass=0;pass<1;pass++){
@@ -258,9 +399,18 @@ void CLRadixSort::Sort(){
     }
     Reorder(pass);
   }
-  sort_time=histo_time+scan_time+reorder_time;
-  cout << "End sorting"<<endl;
 
+  if (TRANSPOSE){
+    if (VERBOSE) {
+      cout << "Transpose back"<<endl;
+    }
+    Transpose(nbcol,nbrow);
+  }
+
+  sort_time=histo_time+scan_time+reorder_time+transpose_time;
+  if (VERBOSE){
+    cout << "End sorting"<<endl;
+  }
 }
 
 
@@ -275,20 +425,20 @@ void CLRadixSort::Check(){
 
   // first see if the final list is ordered
   for(uint i=0;i<nkeys-1;i++){
-    if (!(h_Keys[index(i)] <= h_Keys[index(i+1)])) {
-      cout <<"erreur tri "<< i<<" "<<h_Keys[index(i)]<<" ,"<<i+1<<" "<<h_Keys[index(i+1)]<<endl;
+    if (!(h_Keys[i] <= h_Keys[i+1])) {
+      cout <<"erreur tri "<< i<<" "<<h_Keys[i]<<" ,"<<i+1<<" "<<h_Keys[i+1]<<endl;
     }
-    assert(h_Keys[index(i)] <= h_Keys[index(i+1)]);
+    assert(h_Keys[i] <= h_Keys[i+1]);
   }
 
   if (PERMUT) {
     cout << "Check the permutation"<<endl;
     // check if the permutation corresponds to the original list
     for(uint i=0;i<nkeys;i++){
-      if (!(h_Keys[index(i)] == h_checkKeys[index(h_Permut[index(i)])])) {
+      if (!(h_Keys[i] == h_checkKeys[h_Permut[i]])) {
 	cout <<"erreur permut "<< i<<" "<<h_Keys[i]<<" ,"<<i+1<<" "<<h_Keys[i+1]<<endl;
       }
-      assert(h_Keys[index(i)] == h_checkKeys[index(h_Permut[index(i)])]);
+      //assert(h_Keys[i] == h_checkKeys[h_Permut[i]]);
     }
   }
 
@@ -376,12 +526,12 @@ ostream& operator<<(ostream& os,  CLRadixSort &radi){
   os<<endl;
 
   for(uint i=0;i<radi.nkeys;i++){
-    os <<i<<" key="<<radi.h_Keys[index(i)]<<endl;
+    os <<i<<" key="<<radi.h_Keys[i]<<endl;
   }
   os<<endl;
 
   for(uint i=0;i<radi.nkeys;i++){
-    os <<i<<" permut="<<radi.h_Permut[index(i)]<<endl;
+    os <<i<<" permut="<<radi.h_Permut[i]<<endl;
   }
   os << endl;
 
@@ -405,10 +555,10 @@ void CLRadixSort::Histogram(uint pass){
   err = clSetKernelArg(ckHistogram, 2, sizeof(uint), &pass);
   assert(err == CL_SUCCESS);
 
-  assert( nkeys%(_GROUPS * _ITEMS) == 0);
-  assert( nkeys <= _N);
+  assert( nkeys_rounded%(_GROUPS * _ITEMS) == 0);
+  assert( nkeys_rounded <= _N);
 
-  err = clSetKernelArg(ckHistogram, 4, sizeof(uint), &nkeys);
+  err = clSetKernelArg(ckHistogram, 4, sizeof(uint), &nkeys_rounded);
   assert(err == CL_SUCCESS);
 
   cl_event eve;
@@ -619,9 +769,9 @@ void CLRadixSort::Reorder(uint pass){
 			NULL); // mem cache
   assert(err == CL_SUCCESS);
 
-  assert( nkeys%(_GROUPS * _ITEMS) == 0);
+  assert( nkeys_rounded%(_GROUPS * _ITEMS) == 0);
 
-  err = clSetKernelArg(ckReorder, 7, sizeof(uint), &nkeys);
+  err = clSetKernelArg(ckReorder, 7, sizeof(uint), &nkeys_rounded);
   assert(err == CL_SUCCESS);
 
 

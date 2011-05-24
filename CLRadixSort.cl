@@ -4,6 +4,22 @@
 // string manipulations
 
 
+// change of index for the transposition
+int index(int i,int n){
+  int ip;
+  if (TRANSPOSE) {
+    int k,l;
+    k= i/(n/_GROUPS/_ITEMS);
+    l = i%(n/_GROUPS/_ITEMS);
+    ip = l * (_GROUPS*_ITEMS) + k;
+  }
+  else {
+    ip=i;
+  }
+  return ip;
+}
+
+
 
 // compute the histogram for each radix and each virtual processor for the pass
 __kernel void histogram(const __global int* d_Keys,
@@ -38,7 +54,7 @@ __kernel void histogram(const __global int* d_Keys,
   int key,shortkey;
 
   for(int i= start; i< start + size;i++){
-    key=d_Keys[index(i)];   
+    key=d_Keys[index(i,n)];   
 
     // extract the group of _BITS bits of the pass
     // the result is in the range 0.._RADIX-1
@@ -58,6 +74,47 @@ __kernel void histogram(const __global int* d_Keys,
   barrier(CLK_GLOBAL_MEM_FENCE);  
 
 
+}
+
+__kernel void transpose(const __global int* invect,
+			__global int* outvect,
+			const int nbcol,
+			const int nbrow,
+			const __global int* inperm,
+			__global int* outperm,
+			__local int* blockmat,
+			__local int* blockperm){
+  
+  int i0 = get_global_id(0)*_GROUPS;  // first row index
+  int j = get_global_id(1);  // column index
+
+  int iloc = 0;  // first local row index
+  int jloc = get_local_id(1);  // local column index
+
+  // fill the cache
+  for(iloc=0;iloc<_GROUPS;iloc++){
+    int k=(i0+iloc)*nbcol+j;  // position in the matrix
+    blockmat[iloc*_GROUPS+jloc]=invect[k];
+    if (PERMUT) {
+      blockperm[iloc*_GROUPS+jloc]=inperm[k];
+    }
+  }
+
+  barrier(CLK_LOCAL_MEM_FENCE);  
+
+  // first row index in the transpose
+  int j0=get_group_id(1)*_GROUPS;
+
+  // put the cache at the good place
+  // loop on the rows
+  for(iloc=0;iloc<_GROUPS;iloc++){
+    int kt=(j0+iloc)*nbrow+i0+jloc;  // position in the transpose
+    outvect[kt]=blockmat[jloc*_GROUPS+iloc];
+    if (PERMUT) {
+      outperm[kt]=blockperm[jloc*_GROUPS+iloc];
+    }
+  }
+ 
 }
 
 // each virtual processor reorders its data using the scanned histogram
@@ -92,15 +149,15 @@ __kernel void reorder(const __global int* d_inKeys,
   int newpos,ik,key,shortkey;
 
   for(int i= start; i< start + size;i++){
-    key = d_inKeys[index(i)];   
+    key = d_inKeys[index(i,n)];   
     shortkey=((key >> (pass * _BITS)) & (_RADIX-1)); 
     //ik= shortkey * groups * items + items * gr + it;
     //newpos=d_Histograms[ik];
     newpos=loc_histo[shortkey * items + it];
-    d_outKeys[index(newpos)]= key;  // killing line !!!
+    d_outKeys[index(newpos,n)]= key;  // killing line !!!
     //d_outKeys[index(i)]= key;  
     if(PERMUT) {
-      d_outPermut[index(newpos)]=d_inPermut[index(i)]; 
+      d_outPermut[index(newpos,n)]=d_inPermut[index(i,n)]; 
     }
     newpos++;
     loc_histo[shortkey * items + it]=newpos;
@@ -194,3 +251,6 @@ __kernel void pastehistograms( __global int* histo,__global int* globsum){
   barrier(CLK_GLOBAL_MEM_FENCE);
 
 }  
+
+
+

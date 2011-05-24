@@ -189,11 +189,24 @@ int main(void){
 
   cout << "Radix="<<_RADIX<<endl;
   cout << "Max Int="<<(uint) _MAXINT <<endl;
-  cout << "tri de "<< _N <<" valeurs"<<endl<<endl;
 
   // sort
 
-  //rs.nkeys=9;
+  // test a non power of two size list
+  rs.Resize((1 << 20) -1);
+
+
+  // cout << rs;
+
+  // cout <<"transpose"<<endl;
+  // rs.Transpose();
+
+  // cout << rs;
+
+  // assert(1==2);
+
+  cout << "sorting "<< rs.nkeys <<" keys"<<endl<<endl;
+
   rs.Sort();
 
   rs.RecupGPU();
@@ -202,6 +215,7 @@ int main(void){
   cout << rs.histo_time<<" s in the histograms"<<endl;
   cout << rs.scan_time<<" s in the scanning"<<endl;
   cout << rs.reorder_time<<" s in the reordering"<<endl;
+  cout << rs.transpose_time<<" s in the transposition"<<endl;
 
   cout << rs.sort_time <<" s total GPU time (without memory transfers)"<<endl;
   // check the results (debugging)
@@ -209,7 +223,7 @@ int main(void){
 
   // display the data (for debugging)
   if (VERBOSE) {
-    // cout << rs;
+    //cout << rs;
   }
 
 
@@ -218,7 +232,7 @@ int main(void){
   clock_t init, final;
   double tcpu;
   init=clock();
-  sort(rs.h_checkKeys,rs.h_checkKeys+_N);
+  sort(rs.h_checkKeys,rs.h_checkKeys+rs.nkeys);
   final=clock()-init;
   tcpu=(double)final / ((double)CLOCKS_PER_SEC);
   cout << tcpu <<" s"<<endl;

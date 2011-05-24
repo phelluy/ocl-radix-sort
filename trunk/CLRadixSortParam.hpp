@@ -8,17 +8,18 @@
 ///////////////////////////////////////////////////////
 // these parameters can be changed
 #define _ITEMS  32 // number of items in a group
-#define _GROUPS 8 // the number of virtual processors is _ITEMS * _GROUPS
+#define _GROUPS 16 // the number of virtual processors is _ITEMS * _GROUPS
 #define  _HISTOSPLIT 128 // number of splits of the histogram
-#define _TOTALBITS 24  // number of bits for the integer in the list (max=32)
-#define _BITS 6  // number of bits in the radix
+#define _TOTALBITS 16  // number of bits for the integer in the list (max=32)
+#define _BITS 4  // number of bits in the radix
 // max size of the sorted vector
 // it has to be divisible by  _ITEMS * _GROUPS
 // (for other sizes, pad the list with big values)
-#define _N (1048576)  
+//#define _N (_ITEMS * _GROUPS * 16)  
+#define _N (1<<21)  // maximal size of the list  
 #define VERBOSE 1
 #define TRANSPOSE 1  // transpose the initial vector (faster memory access)
-#define PERMUT 0  // store the final permutation
+#define PERMUT 1  // store the final permutation
 ////////////////////////////////////////////////////////
 
 
@@ -29,17 +30,3 @@
 // maximal value of integers for the sort to be correct
 #define _MAXINT (1 << _TOTALBITS)
 
-// change of index for the transposition
-inline int index(int i){
-  int ip;
-  if (TRANSPOSE) {
-    int k,l;
-    k= i/(_N/_GROUPS/_ITEMS);
-    l = i%(_N/_GROUPS/_ITEMS);
-    ip = l * (_GROUPS*_ITEMS) + k;
-  }
-  else {
-    ip=i;
-  }
-  return ip;
-}

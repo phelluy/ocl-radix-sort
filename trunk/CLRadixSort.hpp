@@ -53,6 +53,9 @@ public:
   ~CLRadixSort();
   
 
+  // this function allows to change the size of the sorted vector
+  void Resize(int nn);
+
   // this function treats the array d_Keys on the GPU
   // and return the sorting permutation in the array d_Permut
   void Sort();
@@ -62,6 +65,10 @@ public:
 
   // check that the sort is successfull (for debugging)
   void Check(void);
+
+  // transpose the list for faster memeory access
+  // (improve coalescence)
+  void Transpose(int nbrow,int nbcol);
 
   // compute the histograms for one pass
   void Histogram(uint pass);
@@ -85,6 +92,7 @@ public:
 
   // list of keys
   uint nkeys; // actual number of keys
+  uint nkeys_rounded; // next multiple of _ITEMS*_GROUPS
   uint h_checkKeys[_N]; // a copy for check
   uint h_Keys[_N];
   cl_mem d_inKeys;
@@ -96,13 +104,14 @@ public:
   cl_mem d_outPermut;
 
    // OpenCL kernels
+  cl_kernel ckTranspose; // transpose the initial list
   cl_kernel ckHistogram;  // compute histograms
   cl_kernel ckScanHistogram; // scan local histogram
   cl_kernel ckPasteHistogram; // paste local histograms
   cl_kernel ckReorder; // final reordering
 
   // timers
-  float histo_time,scan_time,reorder_time,sort_time;
+  float histo_time,scan_time,reorder_time,sort_time,transpose_time;
 
 };
 

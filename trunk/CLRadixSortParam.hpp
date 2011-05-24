@@ -28,5 +28,5 @@
 #define _PASS (_TOTALBITS/_BITS) // number of needed passes to sort the list
 #define _HISTOSIZE (_ITEMS * _GROUPS * _RADIX ) // size of the histogram
 // maximal value of integers for the sort to be correct
-#define _MAXINT (1 << _TOTALBITS)
+#define _MAXINT (1 << (_TOTALBITS-1))
 

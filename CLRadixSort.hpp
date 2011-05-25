@@ -35,6 +35,7 @@ typedef cl_uint uint;
 #include<iostream>
 #include<assert.h>
 #include<math.h>
+#include <stdlib.h>
 
 using namespace std;
 

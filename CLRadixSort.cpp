@@ -26,7 +26,7 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
   assert(_TOTALBITS % _BITS == 0);
   assert(_N % (_GROUPS * _ITEMS) == 0);
   assert( (_GROUPS * _ITEMS * _RADIX) % _HISTOSPLIT == 0);
-  assert(pow(2,(int) log2(_GROUPS)) == _GROUPS);
+    assert(pow(2,(int) log2(_GROUPS)) == _GROUPS);
   assert(pow(2,(int) log2(_ITEMS)) == _ITEMS);
 
   // init the timers
@@ -256,13 +256,18 @@ void CLRadixSort::Resize(int nn){
 // transpose the list for faster memory access
 void CLRadixSort::Transpose(int nbrow,int nbcol){
 
-// __kernel void transpose(const __global int* invect,
-// 			__global int* outvect,
-// 			const int nbcol,
-// 			const int nbrow,
-// 			const __global int* inperm,
-// 			__global int* outperm){
+#define _TRANSBLOCK 32 // size of the matrix block loaded into local memeory
 
+
+  int tilesize=_TRANSBLOCK;
+
+  // if the matrix is too small, avoid using local memory
+  if (nbrow%tilesize != 0) tilesize=1;
+  if (nbcol%tilesize != 0) tilesize=1;
+
+  if (tilesize == 1) {
+    cout << "Warning, small list, avoiding cache..."<<endl;
+  }
 
   cl_int err;
 
@@ -284,30 +289,28 @@ void CLRadixSort::Transpose(int nbrow,int nbcol){
   err  = clSetKernelArg(ckTranspose, 5, sizeof(cl_mem), &d_outPermut);
   assert(err == CL_SUCCESS);
 
-  err  = clSetKernelArg(ckTranspose, 6, sizeof(uint)*_GROUPS*_GROUPS, NULL);
+  err  = clSetKernelArg(ckTranspose, 6, sizeof(uint)*tilesize*tilesize, NULL);
   assert(err == CL_SUCCESS);
 
-  err  = clSetKernelArg(ckTranspose, 7, sizeof(uint)*_GROUPS*_GROUPS, NULL);
+  err  = clSetKernelArg(ckTranspose, 7, sizeof(uint)*tilesize*tilesize, NULL);
   assert(err == CL_SUCCESS);
 
-  // err  = clSetKernelArg(ckScanHistogram, 1,
-  // 			sizeof(uint)* maxmemcache ,
-  // 			NULL); // mem cache
-
+  err = clSetKernelArg(ckTranspose, 8, sizeof(uint), &tilesize);
+  assert(err == CL_SUCCESS);
 
   cl_event eve;
 
   size_t global_work_size[2];
   size_t local_work_size[2];
 
-  assert(nbrow%_GROUPS == 0);
-  assert(nbcol%_GROUPS == 0);
+  assert(nbrow%tilesize == 0);
+  assert(nbcol%tilesize == 0);
 
-  global_work_size[0]=nbrow/_GROUPS;
+  global_work_size[0]=nbrow/tilesize;
   global_work_size[1]=nbcol;
 
   local_work_size[0]=1;
-  local_work_size[1]=_GROUPS;
+  local_work_size[1]=tilesize;
 
 
   err = clEnqueueNDRangeKernel(CommandQueue,

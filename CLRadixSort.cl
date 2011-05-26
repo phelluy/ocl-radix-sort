@@ -83,35 +83,36 @@ __kernel void transpose(const __global int* invect,
 			const __global int* inperm,
 			__global int* outperm,
 			__local int* blockmat,
-			__local int* blockperm){
+			__local int* blockperm,
+			const int tilesize){
   
-  int i0 = get_global_id(0)*_GROUPS;  // first row index
+  int i0 = get_global_id(0)*tilesize;  // first row index
   int j = get_global_id(1);  // column index
 
   int iloc = 0;  // first local row index
   int jloc = get_local_id(1);  // local column index
 
   // fill the cache
-  for(iloc=0;iloc<_GROUPS;iloc++){
+  for(iloc=0;iloc<tilesize;iloc++){
     int k=(i0+iloc)*nbcol+j;  // position in the matrix
-    blockmat[iloc*_GROUPS+jloc]=invect[k];
+    blockmat[iloc*tilesize+jloc]=invect[k];
     if (PERMUT) {
-      blockperm[iloc*_GROUPS+jloc]=inperm[k];
+      blockperm[iloc*tilesize+jloc]=inperm[k];
     }
   }
 
   barrier(CLK_LOCAL_MEM_FENCE);  
 
   // first row index in the transpose
-  int j0=get_group_id(1)*_GROUPS;
+  int j0=get_group_id(1)*tilesize;
 
   // put the cache at the good place
   // loop on the rows
-  for(iloc=0;iloc<_GROUPS;iloc++){
+  for(iloc=0;iloc<tilesize;iloc++){
     int kt=(j0+iloc)*nbrow+i0+jloc;  // position in the transpose
-    outvect[kt]=blockmat[jloc*_GROUPS+iloc];
+    outvect[kt]=blockmat[jloc*tilesize+iloc];
     if (PERMUT) {
-      outperm[kt]=blockperm[jloc*_GROUPS+iloc];
+      outperm[kt]=blockperm[jloc*tilesize+iloc];
     }
   }
  

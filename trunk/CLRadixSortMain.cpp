@@ -158,6 +158,31 @@ int main(void){
     cout << "Calcul sur Carte Graphique"<<endl;
   }
 
+  // mémoire cache du  device
+  cl_ulong memcache;
+  status = clGetDeviceInfo(
+			   Devices[numdev],
+			   CL_DEVICE_LOCAL_MEM_SIZE,
+			   sizeof(cl_ulong),
+			   (void*)&memcache,
+			   NULL);
+  assert (status == CL_SUCCESS);
+
+  cout << "GPU cache="<<memcache<<endl;
+  cout << "Needed cache="<< _ITEMS*_RADIX*sizeof(int)<<endl;
+
+  // nombre de CL_DEVICE_MAX_COMPUTE_UNITS
+  cl_ulong cores;
+  status = clGetDeviceInfo(
+			   Devices[numdev],
+			   CL_DEVICE_MAX_COMPUTE_UNITS,
+			   sizeof(cl_ulong),
+			   (void*)&cores,
+			   NULL);
+  assert (status == CL_SUCCESS);
+
+  cout << "Compute units="<<cores<<endl;
+
   // création d'un contexte opencl
   cout <<"Create the context"<<endl;
   Context = clCreateContext(0,
@@ -193,7 +218,8 @@ int main(void){
   // sort
 
   // test a non power of two size list
-  rs.Resize((1 << 20) -1);
+  //rs.Resize((1 << 20) -1);
+  //rs.Resize(10);
 
 
   // cout << rs;

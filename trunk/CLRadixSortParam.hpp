@@ -7,10 +7,10 @@
 // they are included in the class AND in the OpenCL kernels
 ///////////////////////////////////////////////////////
 // these parameters can be changed
-#define _ITEMS  128 // number of items in a group
-#define _GROUPS 128 // the number of virtual processors is _ITEMS * _GROUPS
+#define _ITEMS  16 // number of items in a group
+#define _GROUPS 16 // the number of virtual processors is _ITEMS * _GROUPS
 #define  _HISTOSPLIT 512 // number of splits of the histogram
-#define _TOTALBITS 10  // number of bits for the integer in the list (max=32)
+#define _TOTALBITS 30  // number of bits for the integer in the list (max=32)
 #define _BITS 5  // number of bits in the radix
 // max size of the sorted vector
 // it has to be divisible by  _ITEMS * _GROUPS
@@ -18,7 +18,7 @@
 //#define _N (_ITEMS * _GROUPS * 16)  
 #define _N (1<<23)  // maximal size of the list  
 #define VERBOSE 0
-#define TRANSPOSE 1  // transpose the initial vector (faster memory access)
+#define TRANSPOSE 0  // transpose the initial vector (faster memory access)
 #define PERMUT 1  // store the final permutation
 ////////////////////////////////////////////////////////
 

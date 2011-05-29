@@ -172,11 +172,11 @@ int main(void){
   cout << "Needed cache="<< _ITEMS*_RADIX*sizeof(int)<<endl;
 
   // nombre de CL_DEVICE_MAX_COMPUTE_UNITS
-  cl_ulong cores;
+  cl_int cores;
   status = clGetDeviceInfo(
 			   Devices[numdev],
 			   CL_DEVICE_MAX_COMPUTE_UNITS,
-			   sizeof(cl_ulong),
+			   sizeof(cl_int),
 			   (void*)&cores,
 			   NULL);
   assert (status == CL_SUCCESS);

@@ -145,24 +145,27 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
 				&err);
   assert(err == CL_SUCCESS);
 
-  err = clEnqueueWriteBuffer(CommandQueue,
-			     d_inKeys,
-			     CL_TRUE, 0,
-			     sizeof(uint) * _N,
-			     h_Keys,
-			     0, NULL, NULL);
-  assert(err == CL_SUCCESS);
+  // err = clEnqueueWriteBuffer(CommandQueue,
+  // 			     d_inKeys,
+  // 			     CL_TRUE, 0,
+  // 			     sizeof(uint) * _N,
+  // 			     h_Keys,
+  // 			     0, NULL, NULL);
+  // assert(err == CL_SUCCESS);
 
-  err = clEnqueueWriteBuffer(CommandQueue,
-			     d_inPermut,
-			     CL_TRUE, 0,
-			     sizeof(uint) * _N,
-			     h_Permut,
-			     0, NULL, NULL);
-  assert(err == CL_SUCCESS);
+  // err = clEnqueueWriteBuffer(CommandQueue,
+  // 			     d_inPermut,
+  // 			     CL_TRUE, 0,
+  // 			     sizeof(uint) * _N,
+  // 			     h_Permut,
+  // 			     0, NULL, NULL);
+  // assert(err == CL_SUCCESS);
+
+  // copy the two previous vectors to the device
+  Host2GPU();
 
 
-  // copy on the GPU
+  // allocate the histogram on the GPU
   d_Histograms  = clCreateBuffer(Context,
 				 CL_MEM_READ_WRITE,
 				 sizeof(uint)* _RADIX * _GROUPS * _ITEMS,
@@ -171,7 +174,7 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
   assert(err == CL_SUCCESS);
 
 
-  // copy on the GPU
+  // allocate the auxiliary histogram on GPU
   d_globsum  = clCreateBuffer(Context,
 			      CL_MEM_READ_WRITE,
 			      sizeof(uint)* _HISTOSPLIT,
@@ -384,7 +387,6 @@ void CLRadixSort::Sort(){
   }
 
   for(uint pass=0;pass<_PASS;pass++){
-    //for(uint pass=0;pass<1;pass++){
     if (VERBOSE) {
       cout << "pass "<<pass<<endl;
     }
@@ -449,12 +451,102 @@ void CLRadixSort::Check(){
 
 }
 
+void CLRadixSort::PICSorting(void){
+
+  // allocate positions and velocities of particles
+  static float xp[_N],yp[_N],up[_N],vp[_N];
+  static float xs[_N],ys[_N],us[_N],vs[_N];
+
+  cout << "Init particles"<<endl;
+  // use van der Corput sequences for initializations
+  for(int j=0;j<_N;j++){
+    xp[j]=corput(j,2,3);
+    yp[j]=corput(j,3,5);
+    up[j]=corput(j,2,5);
+    vp[j]=corput(j,3,7);
+    h_Permut[j]=j;
+    // compute the cell number
+    int ix=floor(xp[j]*32);
+    int iy=floor(yp[j]*32);
+    assert(ix>=0 && ix<32);
+    assert(iy>=0 && iy<32);
+    int k=32*ix+iy;
+    h_Keys[j]=k;
+  }
+
+  Host2GPU();
+
+  // init the timers
+  histo_time=0;
+  scan_time=0;
+  reorder_time=0;
+  transpose_time=0;
+
+  cout << "GPU first sorting"<<endl;
+  Sort();
+
+  cout << histo_time<<" s in the histograms"<<endl;
+  cout << scan_time<<" s in the scanning"<<endl;
+  cout << reorder_time<<" s in the reordering"<<endl;
+  cout << transpose_time<<" s in the transposition"<<endl;
+  cout << sort_time <<" s total GPU time (without memory transfers)"<<endl;
+
+  RecupGPU();
+
+  cout << "Reorder particles"<<endl;
+
+  for(int j=0;j<_N;j++){
+    xs[j]=xp[h_Permut[j]];
+    ys[j]=yp[h_Permut[j]];
+    us[j]=up[h_Permut[j]];
+    vs[j]=vp[h_Permut[j]];
+  }
+
+  // move particles
+  float delta=0.1;
+  for(int j=0;j<_N;j++){
+    xp[j]=xs[j]+delta*us[j]/32;
+    xp[j]=xp[j]-floor(xp[j]);
+    yp[j]=ys[j]+delta*vs[j]/32;
+    yp[j]=yp[j]-floor(yp[j]);
+    h_Permut[j]=j;
+    // compute the cell number
+    int ix=floor(xp[j]*32);
+    int iy=floor(yp[j]*32);
+    assert(ix>=0 && ix<32);
+    assert(iy>=0 && iy<32);
+    int k=32*ix+iy;
+    h_Keys[j]=k;
+  }
+  
+  Host2GPU();
+
+  // init the timers
+  histo_time=0;
+  scan_time=0;
+  reorder_time=0;
+  transpose_time=0;
+
+  cout << "GPU second sorting"<<endl;
+
+  Sort();
+
+  cout << histo_time<<" s in the histograms"<<endl;
+  cout << scan_time<<" s in the scanning"<<endl;
+  cout << reorder_time<<" s in the reordering"<<endl;
+  cout << transpose_time<<" s in the transposition"<<endl;
+  cout << sort_time <<" s total GPU time (without memory transfers)"<<endl;
+
+
+}
+
 CLRadixSort::~CLRadixSort()
 {
   clReleaseKernel(ckHistogram);
   clReleaseKernel(ckScanHistogram);
   clReleaseKernel(ckPasteHistogram);
   clReleaseKernel(ckReorder);
+  clReleaseKernel(ckTranspose);
   clReleaseProgram(Program);
   clReleaseMemObject(d_inKeys);
   clReleaseMemObject(d_outKeys);
@@ -464,6 +556,8 @@ CLRadixSort::~CLRadixSort()
   clReleaseMemObject(d_outPermut);
 };
 
+
+// get the data from the GPU
 void CLRadixSort::RecupGPU(void){
 
   cl_int status;
@@ -507,6 +601,33 @@ void CLRadixSort::RecupGPU(void){
   assert (status == CL_SUCCESS);
 
   clFinish(CommandQueue);  // wait end of read
+}
+
+// put the data to the GPU
+void CLRadixSort::Host2GPU(void){
+
+  cl_int status;
+
+  status = clEnqueueWriteBuffer( CommandQueue,
+				d_inKeys,
+				CL_TRUE, 0, 
+				sizeof(uint)  * _N,
+				h_Keys,
+				0, NULL, NULL ); 
+ 
+  assert (status == CL_SUCCESS);
+  clFinish(CommandQueue);  // wait end of read
+
+  status = clEnqueueWriteBuffer( CommandQueue,
+				d_inPermut,
+				CL_TRUE, 0, 
+				sizeof(uint)  * _N,
+				h_Permut,
+				0, NULL, NULL ); 
+ 
+  assert (status == CL_SUCCESS);
+  clFinish(CommandQueue);  // wait end of read
+
 }
 
 // display
@@ -674,6 +795,7 @@ void CLRadixSort::ScanHistogram(void){
 
   nbitems= _HISTOSPLIT / 2;
   nblocitems=nbitems;
+  //nblocitems=1;
 
   err = clEnqueueNDRangeKernel(CommandQueue,
   			       ckScanHistogram,
@@ -828,4 +950,17 @@ void CLRadixSort::Reorder(uint pass){
   d_outPermut=d_temp;
 
 }
+
+//  van der corput sequence
+float corput(int n,int k1,int k2){
+  float corput=0;
+  float s=1;
+  while(n>0){
+    s/=k1;
+    corput+=(k2*n%k1)%k1*s;
+    n/=k1;
+  }
+  return corput;
+}
+
 

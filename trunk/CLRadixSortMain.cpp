@@ -264,6 +264,11 @@ int main(void){
   cout << tcpu <<" s"<<endl;
 
   cout <<"speedup="<<tcpu/rs.sort_time<<endl;
+
+
+  // pic sorting test
+  cout << "PIC sorting test"<<endl;
+  rs.PICSorting();
   
 
   return 0;

@@ -64,8 +64,14 @@ public:
   // get the data from the GPU (for debugging)
   void RecupGPU(void);
 
+  // put the data on the host in the GPU
+  void Host2GPU(void);
+
   // check that the sort is successfull (for debugging)
   void Check(void);
+
+  // sort a set of particles (for debugging)
+  void PICSorting(void);
 
   // transpose the list for faster memeory access
   // (improve coalescence)
@@ -116,5 +122,7 @@ public:
 
 };
 
+
+float corput(int n,int k1,int k2);
 
 #endif

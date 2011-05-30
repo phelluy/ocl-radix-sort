@@ -133,7 +133,7 @@ __kernel void reorder(const __global int* d_inKeys,
   barrier(CLK_LOCAL_MEM_FENCE);  
 
 
-  int newpos,ik,key,shortkey,k,newpost;
+  int newpos,key,shortkey,k,newpost;
 
   for(int j= 0; j< size;j++){
 #ifdef TRANSPOSE

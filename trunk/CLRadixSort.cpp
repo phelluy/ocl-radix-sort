@@ -12,7 +12,9 @@
 
 using namespace std; 
 
-
+// constructor
+// To do: a constructor when the list
+// already exists...
 CLRadixSort::CLRadixSort(cl_context GPUContext,
 			 cl_device_id dev,
 			 cl_command_queue CommandQue) :
@@ -23,6 +25,7 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
 {
 
   nkeys_rounded=nkeys;
+
   // check some conditions
   assert(_TOTALBITS % _BITS == 0);
   assert(_N % (_GROUPS * _ITEMS) == 0);
@@ -62,30 +65,30 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
 
   Program = clCreateProgramWithSource(Context, 1, (const char **)&prog, NULL, &err);
   if (!Program) {
-    printf("Error: Failed to create compute program!\n");
+    cout << "failed to create compute program" << endl;
   }
 
   assert(err == CL_SUCCESS);
 
-  // compilation du code source des kernels
+  // kernel compilation
 
-  // avec drapeau
-// #ifdef MAC
-//     const char *flags = "-DMAC -cl-fast-relaxed-math";
-// #else
-//     const char *flags = "-cl-fast-relaxed-math";
-// #endif
-//   err = clBuildProgram(Program, 0, NULL, flags, NULL, NULL);
+  // with flags
+  // #ifdef MAC
+  //     const char *flags = "-DMAC -cl-fast-relaxed-math";
+  // #else
+  //     const char *flags = "-cl-fast-relaxed-math";
+  // #endif
+  //   err = clBuildProgram(Program, 0, NULL, flags, NULL, NULL);
 
-  // sans drapeau
+  // without flag
   err = clBuildProgram(Program, 0, NULL, NULL, NULL, NULL);
-  // si la compilation échoue, affichage des erreurs et arrêt
+  // if not successful display the errors 
   if (err != CL_SUCCESS) { 
     size_t len;
     char buffer[2048];
-    printf("Error: Failed to build program executable!\n");
+    cout << "failed to build program executable"<<endl;
     clGetProgramBuildInfo(Program, NumDevice, CL_PROGRAM_BUILD_LOG, sizeof(buffer), buffer, &len);
-    printf("%s\n", buffer);
+    cout << endl<< buffer<<endl;
     assert( err == CL_SUCCESS);
   }
 
@@ -102,8 +105,8 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
   assert(err == CL_SUCCESS);
    
 
-  cout << "Construct the random list"<<endl;
   // construction of a random list
+  cout << "Construct the random list"<<endl;
   uint maxint=_MAXINT;
   assert(_MAXINT != 0);
   for(uint i = 0; i < _N; i++){
@@ -116,8 +119,8 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
     h_Permut[i] = i;
   }
 
-  cout << "Send to the GPU"<<endl;
   // copy on the GPU
+  cout << "Send to the GPU"<<endl;
   d_inKeys  = clCreateBuffer(Context,
 			     CL_MEM_READ_WRITE,
 			     sizeof(uint)* _N ,
@@ -146,23 +149,7 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
 				&err);
   assert(err == CL_SUCCESS);
 
-  // err = clEnqueueWriteBuffer(CommandQueue,
-  // 			     d_inKeys,
-  // 			     CL_TRUE, 0,
-  // 			     sizeof(uint) * _N,
-  // 			     h_Keys,
-  // 			     0, NULL, NULL);
-  // assert(err == CL_SUCCESS);
-
-  // err = clEnqueueWriteBuffer(CommandQueue,
-  // 			     d_inPermut,
-  // 			     CL_TRUE, 0,
-  // 			     sizeof(uint) * _N,
-  // 			     h_Permut,
-  // 			     0, NULL, NULL);
-  // assert(err == CL_SUCCESS);
-
-  // copy the two previous vectors to the device
+  // copy the keys and the permutation to the GPU
   Host2GPU();
 
 
@@ -196,15 +183,11 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
 
   // we set here the fixed arguments of the OpenCL kernels
   // the changing arguments are modified elsewhere in the class
-
   err = clSetKernelArg(ckHistogram, 1, sizeof(cl_mem), &d_Histograms);
   assert(err == CL_SUCCESS);
 
   err = clSetKernelArg(ckHistogram, 3, sizeof(uint)*_RADIX*_ITEMS, NULL);
   assert(err == CL_SUCCESS);
-
-  // err = clSetKernelArg(ckHistogram, 3, sizeof(uint)*_ITEMS, NULL);
-  // assert(err == CL_SUCCESS);
 
   err = clSetKernelArg(ckPasteHistogram, 0, sizeof(cl_mem), &d_Histograms);
   assert(err == CL_SUCCESS);
@@ -217,7 +200,7 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
 
   err  = clSetKernelArg(ckReorder, 6,
 			sizeof(uint)* _RADIX * _ITEMS ,
-			NULL); // mem cache
+			NULL); // local cache memory
   assert(err == CL_SUCCESS);
 
 
@@ -349,7 +332,6 @@ void CLRadixSort::Transpose(int nbrow,int nbcol){
 			   sizeof(cl_ulong),
 			       (void*) &debut,
 			   NULL);
-  //cout << err<<" , "<<CL_PROFILING_INFO_NOT_AVAILABLE<<endl;
   assert(err== CL_SUCCESS);
 
   err=clGetEventProfilingInfo (eve,
@@ -360,10 +342,6 @@ void CLRadixSort::Transpose(int nbrow,int nbcol){
   assert(err== CL_SUCCESS);
 
   transpose_time += (float) (fin-debut)/1e9;
-
-
-
-
 
 }
 
@@ -391,7 +369,6 @@ void CLRadixSort::Sort(){
     if (VERBOSE) {
       cout << "pass "<<pass<<endl;
     }
-    //for(uint pass=0;pass<1;pass++){
     if (VERBOSE) {
       cout << "Build histograms "<<endl;
     }
@@ -549,11 +526,11 @@ CLRadixSort::~CLRadixSort()
   clReleaseKernel(ckReorder);
   clReleaseKernel(ckTranspose);
   clReleaseProgram(Program);
-  clReleaseMemObject(d_inKeys);
+  clReleaseMemObject(d_inKeys);  // to do: more clever memory deallocation
   clReleaseMemObject(d_outKeys);
   clReleaseMemObject(d_Histograms);
   clReleaseMemObject(d_globsum);
-  clReleaseMemObject(d_inPermut);
+  clReleaseMemObject(d_inPermut); // to do: more clever memory deallocation
   clReleaseMemObject(d_outPermut);
 };
 
@@ -631,7 +608,7 @@ void CLRadixSort::Host2GPU(void){
 
 }
 
-// display
+// display (for debugging)
 ostream& operator<<(ostream& os,  CLRadixSort &radi){
 
   radi.RecupGPU();
@@ -695,7 +672,6 @@ void CLRadixSort::Histogram(uint pass){
 			       &nblocitems,
 			       0, NULL, &eve);
 
-  //cout << err<<" , "<<CL_OUT_OF_RESOURCES<<endl;
   assert(err== CL_SUCCESS);
 
   clFinish(CommandQueue);
@@ -728,7 +704,7 @@ void CLRadixSort::ScanHistogram(void){
   cl_int err;
 
   // numbers of processors for the local scan
-  // half the size of the local histograms
+  // = half the size of the local histograms
   size_t nbitems=_RADIX* _GROUPS*_ITEMS / 2;
 
 
@@ -759,8 +735,6 @@ void CLRadixSort::ScanHistogram(void){
 			       &nblocitems,
 			       0, NULL, &eve);
 
-  // cout << err<<","<< CL_INVALID_WORK_ITEM_SIZE<< " "<<nbitems<<" "<<nblocitems<<endl;
-  // cout <<CL_DEVICE_MAX_WORK_ITEM_SIZES<<endl;
   assert(err== CL_SUCCESS);
   clFinish(CommandQueue); 
 
@@ -771,7 +745,6 @@ void CLRadixSort::ScanHistogram(void){
 			   sizeof(cl_ulong),
 			       (void*) &debut,
 			   NULL);
-  //cout << err<<" , "<<CL_PROFILING_INFO_NOT_AVAILABLE<<endl;
   assert(err== CL_SUCCESS);
 
   err=clGetEventProfilingInfo (eve,
@@ -787,16 +760,11 @@ void CLRadixSort::ScanHistogram(void){
   err = clSetKernelArg(ckScanHistogram, 0, sizeof(cl_mem), &d_globsum);
   assert(err == CL_SUCCESS);
 
-  // err  = clSetKernelArg(ckScanHistogram, 1,
-  // 			sizeof(uint)* _HISTOSPLIT,
-  // 			NULL); // mem cache
-
   err = clSetKernelArg(ckScanHistogram, 2, sizeof(cl_mem), &d_temp);
   assert(err == CL_SUCCESS);
 
   nbitems= _HISTOSPLIT / 2;
   nblocitems=nbitems;
-  //nblocitems=1;
 
   err = clEnqueueNDRangeKernel(CommandQueue,
   			       ckScanHistogram,
@@ -813,7 +781,6 @@ void CLRadixSort::ScanHistogram(void){
 			   sizeof(cl_ulong),
 			       (void*) &debut,
 			   NULL);
-  //cout << err<<" , "<<CL_PROFILING_INFO_NOT_AVAILABLE<<endl;
   assert(err== CL_SUCCESS);
 
   err=clGetEventProfilingInfo (eve,
@@ -823,7 +790,6 @@ void CLRadixSort::ScanHistogram(void){
 			   NULL);
   assert(err== CL_SUCCESS);
 
-  //  cout <<"durée global scan ="<<(float) (fin-debut)/1e9<<" s"<<endl;
   scan_time += (float) (fin-debut)/1e9;
 
 
@@ -846,7 +812,6 @@ void CLRadixSort::ScanHistogram(void){
 			   sizeof(cl_ulong),
 			       (void*) &debut,
 			   NULL);
-  //cout << err<<" , "<<CL_PROFILING_INFO_NOT_AVAILABLE<<endl;
   assert(err== CL_SUCCESS);
 
   err=clGetEventProfilingInfo (eve,
@@ -855,8 +820,6 @@ void CLRadixSort::ScanHistogram(void){
 			       (void*) &fin,
 			   NULL);
   assert(err== CL_SUCCESS);
-
-  //  cout <<"durée paste ="<<(float) (fin-debut)/1e9<<" s"<<endl;
 
   scan_time += (float) (fin-debut)/1e9;
 
@@ -912,8 +875,6 @@ void CLRadixSort::Reorder(uint pass){
 			       &nblocitems,
 			       0, NULL, &eve);
   
-  //cout << err<<" , "<<CL_MEM_OBJECT_ALLOCATION_FAILURE<<endl;
-
   assert(err== CL_SUCCESS);
   clFinish(CommandQueue);  
 
@@ -924,7 +885,6 @@ void CLRadixSort::Reorder(uint pass){
 			   sizeof(cl_ulong),
 			       (void*) &debut,
 			   NULL);
-  //cout << err<<" , "<<CL_PROFILING_INFO_NOT_AVAILABLE<<endl;
   assert(err== CL_SUCCESS);
 
   err=clGetEventProfilingInfo (eve,
@@ -934,7 +894,6 @@ void CLRadixSort::Reorder(uint pass){
 			   NULL);
   assert(err== CL_SUCCESS);
 
-  //cout <<"durée="<<(float) (fin-debut)/1e9<<" s"<<endl;
   reorder_time += (float) (fin-debut)/1e9;
 
 

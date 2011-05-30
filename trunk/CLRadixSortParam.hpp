@@ -17,7 +17,7 @@
 // it has to be divisible by  _ITEMS * _GROUPS
 // (for other sizes, pad the list with big values)
 //#define _N (_ITEMS * _GROUPS * 16)  
-#define _N (1<<23)  // maximal size of the list  
+#define _N (1<<20)  // maximal size of the list  
 #define VERBOSE 0
 #define TRANSPOSE  // transpose the initial vector (faster memory access)
 //#define PERMUT  // store the final permutation

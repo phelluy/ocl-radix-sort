@@ -18,18 +18,18 @@ using namespace std;
 
 int main(void){
 
-  // initialisations opencl
+  // OpenCL init
 
-  cl_device_id* Devices;   // tableau des devices 
+  cl_device_id* Devices;   // devoces array 
 
   char exten[1000]; // list of extensions to opencl language
 
   cl_uint NbPlatforms;
   cl_context Context;
   cl_uint NbDevices;   // number of devices of the gpu
-  cl_uint numdev;   // numéro du device
-  cl_device_type DeviceType;   // type de device pour le calcul (cpu ou gpu)
-  cl_command_queue CommandQueue;   // file de commandes
+  cl_uint numdev;   // device id
+  cl_device_type DeviceType;   
+  cl_command_queue CommandQueue; 
 
 
   cl_int status;
@@ -37,7 +37,7 @@ int main(void){
   cout <<endl<< "Test CLRadixSort class..."<<endl<<endl;
 
 
-  // lecture du nombre de plateformes open cl
+  // read the opencl  platforms
   status = clGetPlatformIDs(0, NULL, &NbPlatforms);
   assert (status == CL_SUCCESS);
 
@@ -45,14 +45,13 @@ int main(void){
 
   cout << "Found "<<NbPlatforms<<" OpenCL platform"<<endl;
 
-  // allocation du tableaux des plateformes
+  // allocate platforms
   cl_platform_id* Platforms = new cl_platform_id[NbPlatforms];
 
-  // remplissage
   status = clGetPlatformIDs(NbPlatforms, Platforms, NULL);
   assert (status == CL_SUCCESS);
 
-  // affichage
+  // display
   char pbuf[1000];
   for (int i = 0; i < (int)NbPlatforms; ++i) { 
     status = clGetPlatformInfo(Platforms[0],
@@ -65,7 +64,7 @@ int main(void){
     //cout << pbuf <<endl;
   }
 
-  // affichage version opencl
+  // opencl version
   cout << "The OpenCL version is"<<endl;
   for (int i = 0; i < (int)NbPlatforms; ++i) { 
     status = clGetPlatformInfo(Platforms[0],
@@ -78,7 +77,7 @@ int main(void){
     cout << pbuf <<endl;
   }
 
-  // affichages divers
+  // affichages diversdevice name
   for (int i = 0; i < (int)NbPlatforms; ++i) { 
     status = clGetPlatformInfo(Platforms[0],
 			       CL_PLATFORM_NAME,
@@ -90,7 +89,7 @@ int main(void){
     cout << pbuf <<endl;
   }
 
-  // comptage du nombre de devices
+  //  devices count
   status = clGetDeviceIDs(Platforms[0],
 			  CL_DEVICE_TYPE_ALL,
 			  0,
@@ -101,16 +100,14 @@ int main(void){
 
   cout <<"Found "<<NbDevices<< " OpenCL device"<<endl;
 
-  // allocation du tableau des devices
+  // devices allocation
   Devices = new cl_device_id[NbDevices];
 
-  // choix du numéro de device
-  // en général, le premier est le gpu
-  // (mais pas toujours)
+  // set the device number
+  // generally the GPU is the first...
   numdev=0;
   assert(numdev < NbDevices);
 
-  // remplissage du tableau des devices
   status = clGetDeviceIDs(Platforms[0],
 			  CL_DEVICE_TYPE_ALL,
 			  NbDevices,
@@ -119,9 +116,9 @@ int main(void){
   assert (status == CL_SUCCESS);
 
  
-  // informations diverses
+  // some infos
 
-  // type du device
+  // device type
   status = clGetDeviceInfo(
 			   Devices[numdev],
 			   CL_DEVICE_TYPE,
@@ -142,7 +139,7 @@ int main(void){
   cout << pbuf<<endl<<endl;
 
 
-  // extensions OpenCL
+  // opencl extensions
   status = clGetDeviceInfo(
 			   Devices[numdev],
 			   CL_DEVICE_EXTENSIONS,
@@ -164,10 +161,10 @@ int main(void){
   assert (status == CL_SUCCESS);
 
   if (DeviceType == CL_DEVICE_TYPE_CPU){
-    cout << "Calcul sur CPU"<<endl;
+    cout << "Sort on CPU"<<endl;
   }
   else{
-    cout << "Calcul sur Carte Graphique"<<endl;
+    cout << "Sort on GPU"<<endl;
   }
 
   // mémoire cache du  device
@@ -183,7 +180,9 @@ int main(void){
   cout << "GPU cache="<<memcache<<endl;
   cout << "Needed cache="<< _ITEMS*_RADIX*sizeof(int)<<endl;
 
-  // nombre de CL_DEVICE_MAX_COMPUTE_UNITS
+  assert(_ITEMS*_RADIX*sizeof(int) < memcache);
+
+  // compute units number
   cl_int cores;
   status = clGetDeviceInfo(
 			   Devices[numdev],
@@ -195,7 +194,7 @@ int main(void){
 
   cout << "Compute units="<<cores<<endl;
 
-  // création d'un contexte opencl
+  // context opencl
   cout <<"Create the context"<<endl;
   Context = clCreateContext(0,
 			    1,
@@ -208,7 +207,7 @@ int main(void){
   
 
 
-  // creation de la file de calcul
+  // create the commandqueue
   cout <<"Create the command queue"<<endl;
   CommandQueue = clCreateCommandQueue(
 				      Context,

@@ -29,10 +29,10 @@ __kernel void histogram(const __global int* d_Keys,
 			const int n){
 
 
-  int it = get_local_id(0);
-  int ig = get_global_id(0);
+  int it = get_local_id(0);  // i local number of the processor
+  int ig = get_global_id(0); // global number = i + g I
 
-  int gr = get_group_id(0);
+  int gr = get_group_id(0); // g group number
 
   int groups=get_num_groups(0);
   int items=get_local_size(0);
@@ -49,12 +49,21 @@ __kernel void histogram(const __global int* d_Keys,
   // range of keys that are analyzed by the work item
   //int start= gr * n/groups + it * n/groups/items;
   int start= ig *(n/groups/items);
-  int size= n/groups/items;
+  int size= n/groups/items; // size of the sub-list
 
-  int key,shortkey;
+  int key,shortkey,k;
 
-  for(int i= start; i< start + size;i++){
-    key=d_Keys[index(i,n)];   
+  //  for(int j= start; j< start + size;j++){
+  for(int j= 0; j< size;j++){
+    if (TRANSPOSE) {
+      k= groups * items * j + ig;
+    }
+    else {
+      k=j+start;
+    }
+      
+    //key=d_Keys[index(j,n)];   
+    key=d_Keys[k];   
 
     // extract the group of _BITS bits of the pass
     // the result is in the range 0.._RADIX-1
@@ -147,18 +156,25 @@ __kernel void reorder(const __global int* d_inKeys,
   barrier(CLK_LOCAL_MEM_FENCE);  
 
 
-  int newpos,ik,key,shortkey;
+  int newpos,ik,key,shortkey,k,newpost;
 
-  for(int i= start; i< start + size;i++){
-    key = d_inKeys[index(i,n)];   
+  for(int j= 0; j< size;j++){
+    if (TRANSPOSE) {
+      k= groups * items * j + ig;
+    }
+    else {
+      k=j+start;
+    }
+    key = d_inKeys[k];   
     shortkey=((key >> (pass * _BITS)) & (_RADIX-1)); 
     //ik= shortkey * groups * items + items * gr + it;
     //newpos=d_Histograms[ik];
     newpos=loc_histo[shortkey * items + it];
-    d_outKeys[index(newpos,n)]= key;  // killing line !!!
+    newpost=index(newpos,n);
+    d_outKeys[newpost]= key;  // killing line !!!
     //d_outKeys[index(i)]= key;  
     if(PERMUT) {
-      d_outPermut[index(newpos,n)]=d_inPermut[index(i,n)]; 
+      d_outPermut[newpost]=d_inPermut[k]; 
     }
     newpos++;
     loc_histo[shortkey * items + it]=newpos;

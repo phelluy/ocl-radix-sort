@@ -8,11 +8,11 @@
 // they are included in the class AND in the OpenCL kernels
 ///////////////////////////////////////////////////////
 // these parameters can be changed
-#define _ITEMS  32 // number of items in a group
-#define _GROUPS 16 // the number of virtual processors is _ITEMS * _GROUPS
+#define _ITEMS  64 // number of items in a group
+#define _GROUPS 128 // the number of virtual processors is _ITEMS * _GROUPS
 #define  _HISTOSPLIT 512 // number of splits of the histogram
-#define _TOTALBITS 30  // number of bits for the integer in the list (max=32)
-#define _BITS 6  // number of bits in the radix
+#define _TOTALBITS 10  // number of bits for the integer in the list (max=32)
+#define _BITS 5  // number of bits in the radix
 // max size of the sorted vector
 // it has to be divisible by  _ITEMS * _GROUPS
 // (for other sizes, pad the list with big values)

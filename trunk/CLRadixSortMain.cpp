@@ -130,7 +130,19 @@ int main(void){
 			   NULL);
   assert (status == CL_SUCCESS);
 
+  // device name
+  status = clGetDeviceInfo(
+			   Devices[numdev],
+			   CL_DEVICE_NAME,
+			   sizeof(exten),
+			   pbuf,
+			   NULL);
+  assert (status == CL_SUCCESS);
+  
+  cout << pbuf<<endl<<endl;
 
+
+  // extensions OpenCL
   status = clGetDeviceInfo(
 			   Devices[numdev],
 			   CL_DEVICE_EXTENSIONS,
@@ -267,8 +279,8 @@ int main(void){
 
 
   // pic sorting test
-  cout << "PIC sorting test"<<endl;
-  rs.PICSorting();
+  // cout << "PIC sorting test"<<endl;
+  // rs.PICSorting();
   
 
   return 0;

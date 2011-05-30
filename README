@@ -16,7 +16,7 @@ The algorithm is the radix sort algorithm
 Marcho Zagha and Guy E. Blelloch. “Radix Sort For Vector Multiprocessor.”
 Conference on High Performance Networking and Computing, pp. 712-721, 1991.
 
-The pdf can be found by Google.
+see also http://hal.archives-ouvertes.fr/hal-00596730
 
 Each integer is made of _TOTALBITS bits. The radix is made of _BITS bits. The sort is made of
 several passes, each consisting in sorting against a group of bits corresponding to the radix.

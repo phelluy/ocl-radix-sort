@@ -1,25 +1,7 @@
 // OpenCL kernel sources for the CLRadixSort class
-// the precompilateur does not exist in OpenCL
+// the #include does not exist in OpenCL
 // thus we simulate the #include "CLRadixSortParam.hpp" by
 // string manipulations
-
-
-// change of index for the transposition
-int index(int i,int n){
-  int ip;
-  if (TRANSPOSE) {
-    int k,l;
-    k= i/(n/_GROUPS/_ITEMS);
-    l = i%(n/_GROUPS/_ITEMS);
-    ip = l * (_GROUPS*_ITEMS) + k;
-  }
-  else {
-    ip=i;
-  }
-  return ip;
-}
-
-
 
 // compute the histogram for each radix and each virtual processor for the pass
 __kernel void histogram(const __global int* d_Keys,
@@ -27,7 +9,6 @@ __kernel void histogram(const __global int* d_Keys,
 			const int pass,
 			__local int* loc_histo,
 			const int n){
-
 
   int it = get_local_id(0);  // i local number of the processor
   int ig = get_global_id(0); // global number = i + g I
@@ -39,7 +20,6 @@ __kernel void histogram(const __global int* d_Keys,
 
   // set the local histograms to zero
   for(int ir=0;ir<_RADIX;ir++){
-    //d_Histograms[ir * groups * items + items * gr + it]=0;
     loc_histo[ir * items + it] = 0;
   }
 
@@ -47,29 +27,27 @@ __kernel void histogram(const __global int* d_Keys,
 
 
   // range of keys that are analyzed by the work item
-  //int start= gr * n/groups + it * n/groups/items;
-  int start= ig *(n/groups/items);
   int size= n/groups/items; // size of the sub-list
+  int start= ig * size; // beginning of the sub-list
 
   int key,shortkey,k;
 
-  //  for(int j= start; j< start + size;j++){
+  // compute the index
+  // the computation depends on the transposition
   for(int j= 0; j< size;j++){
-    if (TRANSPOSE) {
-      k= groups * items * j + ig;
-    }
-    else {
-      k=j+start;
-    }
+#ifdef TRANSPOSE
+    k= groups * items * j + ig;
+#else
+    k=j+start;
+#endif
       
-    //key=d_Keys[index(j,n)];   
     key=d_Keys[k];   
 
     // extract the group of _BITS bits of the pass
     // the result is in the range 0.._RADIX-1
     shortkey=(( key >> (pass * _BITS)) & (_RADIX-1));  
 
-    //d_Histograms[shortkey * groups * items + items * gr + it]++;
+    // increment the local histogram
     loc_histo[shortkey *  items + it ]++;
   }
 
@@ -77,7 +55,7 @@ __kernel void histogram(const __global int* d_Keys,
 
   // copy the local histogram to the global one
   for(int ir=0;ir<_RADIX;ir++){
-    d_Histograms[ir * groups * items + items * gr + it]=loc_histo[ir * items + it];
+    d_Histograms[items * (ir * groups + gr) + it]=loc_histo[ir * items + it];
   }
   
   barrier(CLK_GLOBAL_MEM_FENCE);  
@@ -85,6 +63,8 @@ __kernel void histogram(const __global int* d_Keys,
 
 }
 
+// initial transpose of the list for improving
+// coalescent memory access
 __kernel void transpose(const __global int* invect,
 			__global int* outvect,
 			const int nbcol,
@@ -98,16 +78,15 @@ __kernel void transpose(const __global int* invect,
   int i0 = get_global_id(0)*tilesize;  // first row index
   int j = get_global_id(1);  // column index
 
-  int iloc = 0;  // first local row index
   int jloc = get_local_id(1);  // local column index
 
   // fill the cache
-  for(iloc=0;iloc<tilesize;iloc++){
+  for(int iloc=0;iloc<tilesize;iloc++){
     int k=(i0+iloc)*nbcol+j;  // position in the matrix
     blockmat[iloc*tilesize+jloc]=invect[k];
-    if (PERMUT) {
-      blockperm[iloc*tilesize+jloc]=inperm[k];
-    }
+#ifdef PERMUT 
+    blockperm[iloc*tilesize+jloc]=inperm[k];
+#endif
   }
 
   barrier(CLK_LOCAL_MEM_FENCE);  
@@ -116,13 +95,12 @@ __kernel void transpose(const __global int* invect,
   int j0=get_group_id(1)*tilesize;
 
   // put the cache at the good place
-  // loop on the rows
-  for(iloc=0;iloc<tilesize;iloc++){
+  for(int iloc=0;iloc<tilesize;iloc++){
     int kt=(j0+iloc)*nbrow+i0+jloc;  // position in the transpose
     outvect[kt]=blockmat[jloc*tilesize+iloc];
-    if (PERMUT) {
+#ifdef PERMUT 
       outperm[kt]=blockperm[jloc*tilesize+iloc];
-    }
+#endif
   }
  
 }
@@ -144,14 +122,13 @@ __kernel void reorder(const __global int* d_inKeys,
   int groups=get_num_groups(0);
   int items=get_local_size(0);
 
-  //int start= gr * n/groups + it * n/groups/items;
   int start= ig *(n/groups/items);
   int size= n/groups/items;
 
-  // take the histograms in the cache
+  // take the histogram in the cache
   for(int ir=0;ir<_RADIX;ir++){
     loc_histo[ir * items + it]=
-      d_Histograms[ir * groups * items + items * gr + it];
+      d_Histograms[items * (ir * groups + gr) + it];
   }
   barrier(CLK_LOCAL_MEM_FENCE);  
 
@@ -159,30 +136,36 @@ __kernel void reorder(const __global int* d_inKeys,
   int newpos,ik,key,shortkey,k,newpost;
 
   for(int j= 0; j< size;j++){
-    if (TRANSPOSE) {
+#ifdef TRANSPOSE
       k= groups * items * j + ig;
-    }
-    else {
+#else
       k=j+start;
-    }
+#endif
     key = d_inKeys[k];   
     shortkey=((key >> (pass * _BITS)) & (_RADIX-1)); 
-    //ik= shortkey * groups * items + items * gr + it;
-    //newpos=d_Histograms[ik];
+
     newpos=loc_histo[shortkey * items + it];
-    newpost=index(newpos,n);
+
+
+#ifdef TRANSPOSE
+    int ignew,jnew;
+    ignew= newpos/(n/groups/items);
+    jnew = newpos%(n/groups/items);
+    newpost = jnew * (groups*items) + ignew;
+#else
+    newpost=newpos;
+#endif
+
     d_outKeys[newpost]= key;  // killing line !!!
-    //d_outKeys[index(i)]= key;  
-    if(PERMUT) {
+
+#ifdef PERMUT 
       d_outPermut[newpost]=d_inPermut[k]; 
-    }
+#endif
+
     newpos++;
     loc_histo[shortkey * items + it]=newpos;
-    //d_Histograms[ik]=newpos;
-    //barrier(CLK_GLOBAL_MEM_FENCE);  
 
-  }
-  
+  }  
 
 }
 

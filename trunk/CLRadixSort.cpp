@@ -380,12 +380,12 @@ void CLRadixSort::Sort(){
     cout << "Start storting "<<nkeys<< " keys"<<endl;
   }
 
-  if (TRANSPOSE){
+#ifdef TRANSPOSE
     if (VERBOSE) {
       cout << "Transpose"<<endl;
     }
     Transpose(nbrow,nbcol);
-  }
+#endif
 
   for(uint pass=0;pass<_PASS;pass++){
     if (VERBOSE) {
@@ -406,12 +406,12 @@ void CLRadixSort::Sort(){
     Reorder(pass);
   }
 
-  if (TRANSPOSE){
+#ifdef TRANSPOSE
     if (VERBOSE) {
-      cout << "Transpose back"<<endl;
+      cout << "Transpose"<<endl;
     }
     Transpose(nbcol,nbrow);
-  }
+#endif
 
   sort_time=histo_time+scan_time+reorder_time+transpose_time;
   if (VERBOSE){
@@ -437,16 +437,16 @@ void CLRadixSort::Check(){
     assert(h_Keys[i] <= h_Keys[i+1]);
   }
 
-  if (PERMUT) {
-    cout << "Check the permutation"<<endl;
-    // check if the permutation corresponds to the original list
-    for(uint i=0;i<nkeys;i++){
-      if (!(h_Keys[i] == h_checkKeys[h_Permut[i]])) {
-	cout <<"erreur permut "<< i<<" "<<h_Keys[i]<<" ,"<<i+1<<" "<<h_Keys[i+1]<<endl;
-      }
-      //assert(h_Keys[i] == h_checkKeys[h_Permut[i]]);
+#ifdef PERMUT
+  cout << "Check the permutation"<<endl;
+  // check if the permutation corresponds to the original list
+  for(uint i=0;i<nkeys;i++){
+    if (!(h_Keys[i] == h_checkKeys[h_Permut[i]])) {
+      cout <<"erreur permut "<< i<<" "<<h_Keys[i]<<" ,"<<i+1<<" "<<h_Keys[i+1]<<endl;
     }
+    //assert(h_Keys[i] == h_checkKeys[h_Permut[i]]);
   }
+#endif
 
   cout << "test OK !"<<endl;
 

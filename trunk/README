@@ -4,7 +4,7 @@ C++ class for sorting integer lists in OpenCL
 
 Copyright Philippe Helluy, Université de Strasbourg, France, 2011, helluy@math.unistra.fr
 licensed under the GNU Lesser General Public License see http://www.gnu.org/copyleft/lesser.html
-if you find this software usefull you can cite the following work (coming soon...) in your reports or articles:
+if you find this software usefull you can cite the following work in your reports or articles:
 Philippe HELLUY, A portable implementation of the radix sort algorithm in OpenCL, 2011.
 http://hal.archives-ouvertes.fr/hal-00596730
 

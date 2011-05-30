@@ -2,7 +2,8 @@
 // copyright Philippe Helluy, Université de Strasbourg, France, 2011, helluy@math.unistra.fr
 // licensed under the GNU Lesser General Public License see http://www.gnu.org/copyleft/lesser.html
 // if you find this software usefull you can cite the following work in your reports or articles:
-// Philippe HELLUY, A portable implementation of the radix sort algorithm in OpenCL, HAL 2011.
+// Philippe HELLUY, A portable implementation of the radix sort algorithm in OpenCL, 2011.
+// http://hal.archives-ouvertes.fr/hal-00596730
 
 // members of the class CLRadixSort
 // see a description in the hpp...

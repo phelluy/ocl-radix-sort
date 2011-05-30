@@ -2,7 +2,8 @@
 // copyright Philippe Helluy, Université de Strasbourg, France, 2011, helluy@math.unistra.fr
 // licensed under the GNU Lesser General Public License see http://www.gnu.org/copyleft/lesser.html
 // if you find this software usefull you can cite the following work in your reports or articles:
-// Philippe HELLUY, A portable implementation of the radix sort algorithm in OpenCL, HAL 2011.
+// Philippe HELLUY, A portable implementation of the radix sort algorithm in OpenCL, 2011.
+//  http://hal.archives-ouvertes.fr/hal-00596730
 // The algorithm is the radix sort algorithm
 // Marcho Zagha and Guy E. Blelloch. “Radix Sort For Vector Multiprocessor.”
 // in: Conference on High Performance Networking and Computing, pp. 712-721, 1991.

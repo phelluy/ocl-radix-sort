@@ -30,8 +30,21 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
   assert(_TOTALBITS % _BITS == 0);
   assert(_N % (_GROUPS * _ITEMS) == 0);
   assert( (_GROUPS * _ITEMS * _RADIX) % _HISTOSPLIT == 0);
-    assert(pow(2,(int) log2(_GROUPS)) == _GROUPS);
+  assert(pow(2,(int) log2(_GROUPS)) == _GROUPS);
   assert(pow(2,(int) log2(_ITEMS)) == _ITEMS);
+
+  // check that the local mem is sufficient (suggestion of Jose Luis Cercós Pita)
+  cl_ulong localMem;
+  clGetDeviceInfo(dev, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(localMem), &localMem, NULL);
+  if (VERBOSE) {
+    cout << "Cache size="<<localMem <<" Bytes"<<endl;
+    cout << "Needed cache="<< sizeof(cl_uint)*_RADIX*_ITEMS <<" Bytes"<<endl;
+  }
+  assert(localMem > sizeof(cl_uint)*_RADIX*_ITEMS);
+
+  unsigned int maxmemcache=max(_HISTOSPLIT,_ITEMS * _GROUPS * _RADIX / _HISTOSPLIT);
+  assert(localMem > sizeof(cl_uint)*maxmemcache);
+
 
   // init the timers
   histo_time=0;

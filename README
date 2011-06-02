@@ -22,7 +22,6 @@ Each integer is made of _TOTALBITS bits. The radix is made of _BITS bits. The so
 several passes, each consisting in sorting against a group of bits corresponding to the radix.
 _TOTALBITS/_BITS passes are needed.
 
-
 3) Installing
 
 The software is made of a C++ class and an example, given in "CLRadixSortMain.cpp".
@@ -38,6 +37,19 @@ g++ CLRadixSort.cpp CLRadixSortMain.cpp -framework opencl
 
 compilation for Linux:
 g++ CLRadixSort.cpp CLRadixSortMain.cpp -lOpenCL
+
+execution: 
+
+./a.out
+
+If you have scons installed, you can also use the SConstruct script.
+Simply type:
+
+scons 
+
+and then: 
+
+./go
 
 Tested (may 2011) on Mac, Linux with AMD GPU/CPU and NVIDIA GPU.
 

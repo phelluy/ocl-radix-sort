@@ -952,7 +952,7 @@ void CLRadixSort::SortBlocks(void){
   assert(err == CL_SUCCESS);
 
   err  = clSetKernelArg(ckSortBlock, 1,
-			sizeof(uint)* 2 * _BLOCKSIZE ,
+			sizeof(uint) * _BLOCKSIZE ,
 			NULL); // local cache memory
   assert(err == CL_SUCCESS);
 

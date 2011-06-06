@@ -299,7 +299,7 @@ __kernel void sortblock( __global int* keys,   // the keys to be sorted
     localscan(grhisto,&sum);
     
     // write results to device memory    
-    keys[ig] = temp[grhisto[shortkey*blocksize+it]];  
+    keys[grhisto[shortkey*blocksize+it]] = temp[it];  
     //keys[ig] = grhisto[1*blocksize+it];  
     barrier(CLK_GLOBAL_MEM_FENCE);
 

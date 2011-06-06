@@ -27,7 +27,8 @@ int main(void){
   cl_uint NbPlatforms;
   cl_context Context;
   cl_uint NbDevices;   // number of devices of the gpu
-  cl_uint numdev;   // device id
+  cl_uint NumDevice;   // device id
+  cl_uint NumPlatform; // platform id
   cl_device_type DeviceType;   
   cl_command_queue CommandQueue; 
 
@@ -36,50 +37,29 @@ int main(void){
 
   cout <<endl<< "Test CLRadixSort class..."<<endl<<endl;
 
-
-  // read the opencl  platforms
+  // lecture du nombre de plateformes open cl
   status = clGetPlatformIDs(0, NULL, &NbPlatforms);
   assert (status == CL_SUCCESS);
 
   assert(NbPlatforms > 0);
 
-  cout << "Found "<<NbPlatforms<<" OpenCL platform"<<endl;
-
-  // allocate platforms
+  // allocation du tableaux des plateformes
   cl_platform_id* Platforms = new cl_platform_id[NbPlatforms];
 
+  // remplissage
   status = clGetPlatformIDs(NbPlatforms, Platforms, NULL);
   assert (status == CL_SUCCESS);
 
-  // display
-  char pbuf[1000];
+  // affichage
+  cout << "Available platforms:"<<endl;
+
+
+
+  char pbuf[2000];
   for (int i = 0; i < (int)NbPlatforms; ++i) { 
-    status = clGetPlatformInfo(Platforms[0],
-			       CL_PLATFORM_VENDOR,
-			       sizeof(pbuf),
-			       pbuf,
-			       NULL);
-    assert (status == CL_SUCCESS);
-
-    //cout << pbuf <<endl;
-  }
-
-  // opencl version
-  cout << "The OpenCL version is"<<endl;
-  for (int i = 0; i < (int)NbPlatforms; ++i) { 
-    status = clGetPlatformInfo(Platforms[0],
-			       CL_PLATFORM_VERSION,
-			       sizeof(pbuf),
-			       pbuf,
-			       NULL);
-    assert (status == CL_SUCCESS);
-
-    cout << pbuf <<endl;
-  }
-
-  // affichages diversdevice name
-  for (int i = 0; i < (int)NbPlatforms; ++i) { 
-    status = clGetPlatformInfo(Platforms[0],
+    cout <<"Platform "<<i+1<<":"<<endl;
+  // affichages divers
+    status = clGetPlatformInfo(Platforms[i],
 			       CL_PLATFORM_NAME,
 			       sizeof(pbuf),
 			       pbuf,
@@ -87,40 +67,71 @@ int main(void){
     assert (status == CL_SUCCESS);
 
     cout << pbuf <<endl;
+
+    status = clGetPlatformInfo(Platforms[i],
+			       CL_PLATFORM_VENDOR,
+			       sizeof(pbuf),
+			       pbuf,
+			       NULL);
+    assert (status == CL_SUCCESS);
+
+    cout << pbuf <<endl;
+
+  // affichage version opencl
+    status = clGetPlatformInfo(Platforms[i],
+			       CL_PLATFORM_VERSION,
+			       sizeof(pbuf),
+			       pbuf,
+			       NULL);
+    assert (status == CL_SUCCESS);
+
+    cout << pbuf <<endl;
+
   }
 
-  //  devices count
-  status = clGetDeviceIDs(Platforms[0],
+  NumPlatform=NbPlatforms-1;
+  assert(NumPlatform < NbPlatforms);
+
+
+  // comptage du nombre de devices
+  status = clGetDeviceIDs(Platforms[NumPlatform],
 			  CL_DEVICE_TYPE_ALL,
 			  0,
 			  NULL,
 			  &NbDevices);
   assert (status == CL_SUCCESS);
   assert(NbDevices > 0);
+  //cout << NbDevices << endl;
 
-  cout <<"Found "<<NbDevices<< " OpenCL device"<<endl;
-
-  // devices allocation
+  // allocation du tableau des devices
   Devices = new cl_device_id[NbDevices];
 
-  // set the device number
-  // generally the GPU is the first...
-  numdev=0;
-  assert(numdev < NbDevices);
+  // choix du numéro de device
+  // en général, le premier est le gpu
+  // (mais pas toujours)
+  NumDevice=0;
+  assert(NumDevice < NbDevices);
 
-  status = clGetDeviceIDs(Platforms[0],
+
+  cout << "We choose Device "<<NumDevice+1<<"/"<<NbDevices<<
+    " of Platform "<<NumPlatform+1<<"/"<<NbPlatforms<<":"<<endl;
+  
+
+  // remplissage du tableau des devices
+  status = clGetDeviceIDs(Platforms[NumPlatform],
 			  CL_DEVICE_TYPE_ALL,
 			  NbDevices,
 			  Devices,
 			  NULL);
   assert (status == CL_SUCCESS);
 
+  assert(NbDevices > NumDevice);
  
-  // some infos
+  // informations diverses
 
-  // device type
+  // type du device
   status = clGetDeviceInfo(
-			   Devices[numdev],
+			   Devices[NumDevice],
 			   CL_DEVICE_TYPE,
 			   sizeof(cl_device_type),
 			   (void*)&DeviceType,
@@ -129,31 +140,30 @@ int main(void){
 
   // device name
   status = clGetDeviceInfo(
-			   Devices[numdev],
+			   Devices[NumDevice],
 			   CL_DEVICE_NAME,
 			   sizeof(exten),
 			   pbuf,
 			   NULL);
   assert (status == CL_SUCCESS);
   
-  cout << pbuf<<endl<<endl;
+  cout << pbuf<<endl;
 
-
-  // opencl extensions
+  cout << "OpenCL Extensions for that device: ";
   status = clGetDeviceInfo(
-			   Devices[numdev],
+			   Devices[NumDevice],
 			   CL_DEVICE_EXTENSIONS,
 			   sizeof(exten),
 			   exten,
 			   NULL);
   assert (status == CL_SUCCESS);
-  
-  cout<<"OpenCL extensions for this device:"<<endl;
   cout << exten<<endl<<endl;
+
+
 
   // type du device
   status = clGetDeviceInfo(
-			   Devices[numdev],
+			   Devices[NumDevice],
 			   CL_DEVICE_TYPE,
 			   sizeof(cl_device_type),
 			   (void*)&DeviceType,
@@ -170,7 +180,7 @@ int main(void){
   // mémoire cache du  device
   cl_ulong memcache;
   status = clGetDeviceInfo(
-			   Devices[numdev],
+			   Devices[NumDevice],
 			   CL_DEVICE_LOCAL_MEM_SIZE,
 			   sizeof(cl_ulong),
 			   (void*)&memcache,
@@ -185,7 +195,7 @@ int main(void){
   // compute units number
   cl_int cores;
   status = clGetDeviceInfo(
-			   Devices[numdev],
+			   Devices[NumDevice],
 			   CL_DEVICE_MAX_COMPUTE_UNITS,
 			   sizeof(cl_int),
 			   (void*)&cores,
@@ -198,7 +208,7 @@ int main(void){
   cout <<"Create the context"<<endl;
   Context = clCreateContext(0,
 			    1,
-			    &Devices[numdev],
+			    &Devices[NumDevice],
 			    NULL, 
 			    NULL,
 			    &status);
@@ -211,7 +221,7 @@ int main(void){
   cout <<"Create the command queue"<<endl;
   CommandQueue = clCreateCommandQueue(
 				      Context,
-				      Devices[numdev],
+				      Devices[NumDevice],
 				      CL_QUEUE_PROFILING_ENABLE,
 				      &status);
   assert (status == CL_SUCCESS);
@@ -221,7 +231,7 @@ int main(void){
   // end of the minimal opencl declarations
 
   // declaration of a CLRadixSort object
-  static CLRadixSort rs(Context,Devices[numdev],CommandQueue);
+  static CLRadixSort rs(Context,Devices[NumDevice],CommandQueue);
 
   cout << "Radix="<<_RADIX<<endl;
   cout << "Max Int="<<(uint) _MAXINT <<endl;

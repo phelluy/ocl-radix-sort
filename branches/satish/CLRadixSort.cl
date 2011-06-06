@@ -171,7 +171,8 @@ __kernel void reorder(const __global int* d_inKeys,
 
 // perform a exclusive parallel prefix sum on an array stored in local
 // memory and return the sum in (*sum)
-// the size of the array has to be twice the  number of work-items
+// the size of the array HAS to be twice the  number of work-items
+// ToDo: the function could be improved by avoiding bank conflicts...  
 void localscan(__local int* temp,int* sum){
 
   int it = get_local_id(0);
@@ -235,6 +236,72 @@ __kernel void scanhistograms( __global int* histo,__local int* temp,__global int
   temp[2*it+1] = histo[2*ig+1];  
   barrier(CLK_LOCAL_MEM_FENCE);
 
+
+  // scan the local vector
+  localscan(temp,&sum);
+
+  // remember the sum for the next scanning step
+  if (it == 0){
+    globsum[gr]=sum;
+  }
+  // write results to device memory
+
+  histo[2*ig] = temp[2*it];  
+  histo[2*ig+1] = temp[2*it+1];  
+
+  barrier(CLK_GLOBAL_MEM_FENCE);
+
+}  
+
+// first step of the Satish algorithm: sort local blocks that fit into local
+// memory with a radix=2^_SMALLBITS sorting algorithm
+// and compute the groups histogram with the big radix=2^_BITS
+// we thus need _BITS/_SMALLBITS passes
+// let n=blocksize be the size of the local list
+// the histogram is then of size 2^_SMALLBITS * n
+// because we perform a localscan (see above) 
+// it implies that the number of
+// work-items nitems satisfies
+// 2*nitems =  2^_SMALLBITS * n or
+// nitems = n * 2^(_SMALLBITS-1)
+// for instance _SMALLBITS=1 -> nitems=n
+__kernel void sortblock( __global int* keys,   // the keys to be sorted
+			 __local int* temp,  // a copy of the keys in local memory
+			 __local int* grhisto, // group histograms
+			 __global int* histogram)  // global histogram to be scanned
+{   
+
+
+  int it = get_local_id(0);
+  int ig = get_global_id(0);
+  int gr=get_group_id(0);
+  int nkpi=(1 << (_SMALLBITS-1)); // number of keys / items (see above)
+  int blocksize=get_local_size(0) / nkpi; // see above
+  int sum;
+
+  // load keys into local memory
+  for(int ik=0;ik<nkpi;ik++){
+    temp[nkpi*it+ik] = keys[nkpi*ig+ik];  
+    // init the local histogram
+    for(int ir=0;ir<_SMALLRADIX;ir++){
+      grhisto[ir*blocksize+nkpi*it+ik]=0;
+    }
+  }
+  barrier(CLK_LOCAL_MEM_FENCE);
+
+  // sort the local list with a radix=_SMALLRADIX sort
+  // algorithm
+  for(int pass=0;pass < _BITS/_SMALLBITS;pass++){
+    // histogram of the pass
+    int key,shortkey;
+    key=temp[2*it];
+    shortkey=(( key >> (pass * _SMALLBITS)) & (_SMALLRADIX-1));  
+    grhisto[shortkey*blocksize+2*it]++;
+
+
+
+
+ 
 
   // scan the local vector
   localscan(temp,&sum);

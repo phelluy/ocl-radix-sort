@@ -169,23 +169,15 @@ __kernel void reorder(const __global int* d_inKeys,
 
 }
 
-
-// perform a parallel prefix sum (a scan) on the local histograms
-// (see Blelloch 1990) each workitem worries about two memories
-// see also http://http.developer.nvidia.com/GPUGems3/gpugems3_ch39.html
-__kernel void scanhistograms( __global int* histo,__local int* temp,__global int* globsum){
-
+// perform a exclusive parallel prefix sum on an array stored in local
+// memory and return the sum in (*sum)
+// the size of the array has to be twice the  number of work-items
+void localscan(__local int* temp,int* sum){
 
   int it = get_local_id(0);
   int ig = get_global_id(0);
   int decale = 1; 
   int n=get_local_size(0) * 2 ;
-  int gr=get_group_id(0);
-
-  // load input into local memory
-  // up sweep phase
-  temp[2*it] = histo[2*ig];  
-  temp[2*it+1] = histo[2*ig+1];  
  	
   // parallel prefix sum (algorithm of Blelloch 1990) 
   for (int d = n>>1; d > 0; d >>= 1){   
@@ -202,7 +194,7 @@ __kernel void scanhistograms( __global int* histo,__local int* temp,__global int
   // (maybe used in the next step for constructing the global scan)
   // clear the last element
   if (it == 0) {
-    globsum[gr]=temp[n-1];
+    (*sum)=temp[n-1];
     temp[n - 1] = 0;
   }
                  
@@ -222,7 +214,35 @@ __kernel void scanhistograms( __global int* histo,__local int* temp,__global int
 
   }  
   barrier(CLK_LOCAL_MEM_FENCE);
+}
 
+
+
+// perform a parallel prefix sum (a scan) on the local histograms
+// (see Blelloch 1990) each workitem worries about two memories
+// see also http://http.developer.nvidia.com/GPUGems3/gpugems3_ch39.html
+__kernel void scanhistograms( __global int* histo,__local int* temp,__global int* globsum){
+
+
+  int it = get_local_id(0);
+  int ig = get_global_id(0);
+  int gr=get_group_id(0);
+  int sum;
+
+  // load input into local memory
+  // up sweep phase
+  temp[2*it] = histo[2*ig];  
+  temp[2*it+1] = histo[2*ig+1];  
+  barrier(CLK_LOCAL_MEM_FENCE);
+
+
+  // scan the local vector
+  localscan(temp,&sum);
+
+  // remember the sum for the next scanning step
+  if (it == 0){
+    globsum[gr]=sum;
+  }
   // write results to device memory
 
   histo[2*ig] = temp[2*it];  

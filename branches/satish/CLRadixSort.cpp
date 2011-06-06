@@ -52,6 +52,7 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
   scan_time=0;
   reorder_time=0;
   transpose_time=0;
+  locsort_time=0;
   
   //read the program
   string prog;   // program
@@ -106,7 +107,7 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
     assert( err == CL_SUCCESS);
   }
 
-
+  // Blelloch
   ckHistogram = clCreateKernel(Program, "histogram", &err);
   assert(err == CL_SUCCESS);
   ckScanHistogram = clCreateKernel(Program, "scanhistograms", &err);
@@ -118,6 +119,10 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
   ckTranspose = clCreateKernel(Program, "transpose", &err);
   assert(err == CL_SUCCESS);
    
+  //Satish
+  ckSortBlock = clCreateKernel(Program, "sortblock", &err);
+  assert(err == CL_SUCCESS);
+
 
   // construction of a random list
   cout << "Construct the random list"<<endl;
@@ -926,6 +931,71 @@ void CLRadixSort::Reorder(uint pass){
   d_outPermut=d_temp;
 
 }
+
+
+// compute the histograms
+void CLRadixSort::SortBlocks(void){
+
+  cl_int err;
+
+  size_t nblocitems=_BLOCKSIZE;
+  size_t nbitems=_N;
+
+  // assert(_RADIX == pow(2,_BITS));
+
+// __kernel void sortblock( __global int* keys,   // the keys to be sorted
+// 			 __local int* temp,  // a copy of the keys in local memory
+// 			 __local int* grhisto) // group histogram
+// //__global int* histogram)  // global histogram to be scanned
+
+  err  = clSetKernelArg(ckSortBlock, 0, sizeof(cl_mem), &d_inKeys);
+  assert(err == CL_SUCCESS);
+
+  err  = clSetKernelArg(ckSortBlock, 1,
+			sizeof(uint)* _BLOCKSIZE ,
+			NULL); // local cache memory
+  assert(err == CL_SUCCESS);
+
+  err  = clSetKernelArg(ckSortBlock, 2,
+			sizeof(uint) * 2 * _BLOCKSIZE ,
+			NULL); // local cache memory
+  assert(err == CL_SUCCESS);
+
+  cl_event eve;
+
+  err = clEnqueueNDRangeKernel(CommandQueue,
+			       ckSortBlock,
+			       1, NULL,
+			       &nbitems,
+			       &nblocitems,
+			       0, NULL, &eve);
+
+  assert(err== CL_SUCCESS);
+
+  clFinish(CommandQueue);
+
+  cl_ulong debut,fin;
+
+  err=clGetEventProfilingInfo (eve,
+			   CL_PROFILING_COMMAND_QUEUED,
+			   sizeof(cl_ulong),
+			       (void*) &debut,
+			   NULL);
+  //cout << err<<" , "<<CL_PROFILING_INFO_NOT_AVAILABLE<<endl;
+  assert(err== CL_SUCCESS);
+
+  err=clGetEventProfilingInfo (eve,
+			   CL_PROFILING_COMMAND_END,
+			   sizeof(cl_ulong),
+			       (void*) &fin,
+			   NULL);
+  assert(err== CL_SUCCESS);
+
+  locsort_time += (float) (fin-debut)/1e9;
+
+
+}
+
 
 //  van der corput sequence
 float corput(int n,int k1,int k2){

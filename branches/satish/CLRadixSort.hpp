@@ -78,12 +78,17 @@ public:
   // (improve coalescence)
   void Transpose(int nbrow,int nbcol);
 
+  // Blelloch sorting
   // compute the histograms for one pass
   void Histogram(uint pass);
   // scan the histograms
   void ScanHistogram(void);
   // scan the histograms
   void Reorder(uint pass);
+
+  //Satish sorting
+  // sort the local blocks
+  void SortBlocks(void);
 
 
   cl_context Context;             // OpenCL context
@@ -112,14 +117,19 @@ public:
   cl_mem d_outPermut;
 
    // OpenCL kernels
+  // Blelloch
   cl_kernel ckTranspose; // transpose the initial list
   cl_kernel ckHistogram;  // compute histograms
   cl_kernel ckScanHistogram; // scan local histogram
   cl_kernel ckPasteHistogram; // paste local histograms
   cl_kernel ckReorder; // final reordering
 
+  //Satish
+  cl_kernel ckSortBlock; // sort local blocks
+
   // timers
   float histo_time,scan_time,reorder_time,sort_time,transpose_time;
+  float locsort_time;
 
 };
 

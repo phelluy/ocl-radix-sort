@@ -12,7 +12,7 @@ http://hal.archives-ouvertes.fr/hal-00596730
 
 2) Short description
 
-The algorithm is the radix sort algorithm
+The algorithm is the Blelloch version of the radix sort algorithm
 Marcho Zagha and Guy E. Blelloch. “Radix Sort For Vector Multiprocessor.”
 Conference on High Performance Networking and Computing, pp. 712-721, 1991.
 
@@ -21,6 +21,15 @@ see also http://hal.archives-ouvertes.fr/hal-00596730
 Each integer is made of _TOTALBITS bits. The radix is made of _BITS bits. The sort is made of
 several passes, each consisting in sorting against a group of bits corresponding to the radix.
 _TOTALBITS/_BITS passes are needed.
+
+The algorithm has been improved by Satish
+"Designing Efficient Sorting Algorithms for Manycore GPUs"
+Nadathur Satish (UC Berkeley), Mark Harris (NVIDIA), Michael Garland (NVIDIA),
+in Proc. IEEE International Symposium on Parallel & Distributed Processing, May 2009
+
+The Blelloch version is 3-4 times slower than Satish on GPU. I am currently working on the 
+Satish improvements for GPUs...
+
 
 3) Installing
 

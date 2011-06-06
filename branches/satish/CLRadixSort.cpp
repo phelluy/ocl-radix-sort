@@ -29,6 +29,7 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
   // check some conditions
   assert(_TOTALBITS % _BITS == 0);
   assert(_N % (_GROUPS * _ITEMS) == 0);
+  assert(_HISTOSPLIT >= 2);
   assert( (_GROUPS * _ITEMS * _RADIX) % _HISTOSPLIT == 0);
   assert(pow(2,(int) log2(_GROUPS)) == _GROUPS);
   assert(pow(2,(int) log2(_ITEMS)) == _ITEMS);
@@ -645,10 +646,12 @@ ostream& operator<<(ostream& os,  CLRadixSort &radi){
   }
   os<<endl;
 
+#ifdef PERMUT
   for(uint i=0;i<radi.nkeys;i++){
     os <<i<<" permut="<<radi.h_Permut[i]<<endl;
   }
   os << endl;
+#endif
 
   return os;
 

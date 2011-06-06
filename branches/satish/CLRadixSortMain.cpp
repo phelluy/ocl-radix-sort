@@ -240,7 +240,7 @@ int main(void){
 
   // test a non power of two size list
   //rs.Resize((1 << 20) -1);
-  //rs.Resize(10);
+  //rs.Resize(64);
 
 
   // cout << rs;
@@ -265,13 +265,15 @@ int main(void){
   cout << rs.transpose_time<<" s in the transposition"<<endl;
 
   cout << rs.sort_time <<" s total GPU time (without memory transfers)"<<endl;
-  // check the results (debugging)
-  rs.Check();
 
   // display the data (for debugging)
   if (VERBOSE) {
-    //cout << rs;
+    cout << rs;
   }
+
+  // check the results (debugging)
+  rs.Check();
+
 
 
   // sort with the standard c++ sort algorithm

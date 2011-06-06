@@ -254,7 +254,9 @@ int main(void){
 
   cout << "sorting "<< rs.nkeys <<" keys"<<endl<<endl;
 
-  rs.Sort();
+  //rs.Sort();
+
+  rs.SortBlock();
 
   rs.RecupGPU();
 

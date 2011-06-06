@@ -1,0 +1,65 @@
+C++ class for sorting integer lists in OpenCL
+
+1) License
+
+Copyright Philippe Helluy, Université de Strasbourg, France, 2011, helluy@math.unistra.fr
+licensed under the GNU Lesser General Public License see http://www.gnu.org/copyleft/lesser.html
+if you find this software usefull you can cite the following work in your reports or articles:
+Philippe HELLUY, A portable implementation of the radix sort algorithm in OpenCL, 2011.
+http://hal.archives-ouvertes.fr/hal-00596730
+
+
+
+2) Short description
+
+The algorithm is the Blelloch version of the radix sort algorithm
+Marcho Zagha and Guy E. Blelloch. “Radix Sort For Vector Multiprocessor.”
+Conference on High Performance Networking and Computing, pp. 712-721, 1991.
+
+see also http://hal.archives-ouvertes.fr/hal-00596730
+
+Each integer is made of _TOTALBITS bits. The radix is made of _BITS bits. The sort is made of
+several passes, each consisting in sorting against a group of bits corresponding to the radix.
+_TOTALBITS/_BITS passes are needed.
+
+The algorithm has been improved by Satish
+"Designing Efficient Sorting Algorithms for Manycore GPUs"
+Nadathur Satish (UC Berkeley), Mark Harris (NVIDIA), Michael Garland (NVIDIA),
+in Proc. IEEE International Symposium on Parallel & Distributed Processing, May 2009
+
+The Blelloch version is 3-4 times slower than Satish on GPU. I am currently working on the 
+Satish improvements for GPUs...
+
+
+3) Installing
+
+The software is made of a C++ class and an example, given in "CLRadixSortMain.cpp".
+No library needed (but a working OpenCL installation and g++)
+
+The sorting parameters can be changed in "CLRadixSortParam.hpp". It is possible to change the size of the integers,
+the size of the radix, the maximal size of the list, and the distribution of the 
+work-groups and work-items on the device for obtaining optimal speed and/or avoid 
+overflow of the device shared memory.
+
+compilation for Mac:
+g++ CLRadixSort.cpp CLRadixSortMain.cpp -framework opencl
+
+compilation for Linux:
+g++ CLRadixSort.cpp CLRadixSortMain.cpp -lOpenCL
+
+execution: 
+
+./a.out
+
+If you have scons installed, you can also use the SConstruct script.
+Simply type:
+
+scons 
+
+and then: 
+
+./go
+
+Tested (may 2011) on Mac, Linux with AMD GPU/CPU and NVIDIA GPU.
+
+Not tested on Intel under Windows.

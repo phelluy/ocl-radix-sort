@@ -283,25 +283,26 @@ __kernel void sortblock( __global int* keys,   // the keys to be sorted
     // load keys into local memory
     temp[it] = keys[ig];  
     // init the local histogram
-    for(int ir=0;ir<1;ir++){
-      grhisto[ir*blocksize+it]=0;
-    }
+    grhisto[it]=0;
+    grhisto[blocksize+it]=0;
+
     barrier(CLK_LOCAL_MEM_FENCE);
     
     // histogram of the pass
     int key,shortkey;
     key=temp[it];
     shortkey=( ( key >> pass ) & 1 );  
-    grhisto[shortkey*blocksize+it]++;
+    grhisto[shortkey*blocksize+it]=1;
     barrier(CLK_LOCAL_MEM_FENCE);
     
     // scan the local vector
     localscan(grhisto,&sum);
     
-    // write results to device memory
-    
+    // write results to device memory    
     keys[ig] = temp[grhisto[shortkey*blocksize+it]];  
+    //keys[ig] = grhisto[1*blocksize+it];  
     barrier(CLK_GLOBAL_MEM_FENCE);
+
   }
 }  
 

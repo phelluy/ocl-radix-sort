@@ -116,6 +116,8 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
   assert(err == CL_SUCCESS);
   ckReorder = clCreateKernel(Program, "reorder", &err);
   assert(err == CL_SUCCESS);
+  ckReorderSatish = clCreateKernel(Program, "reordersatish", &err);
+  assert(err == CL_SUCCESS);
   ckTranspose = clCreateKernel(Program, "transpose", &err);
   assert(err == CL_SUCCESS);
    
@@ -188,6 +190,13 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
 				 &err);
   assert(err == CL_SUCCESS);
 
+  // allocate the Offset on the GPU
+  d_Offset  = clCreateBuffer(Context,
+				 CL_MEM_READ_WRITE,
+				  sizeof(uint)* (_RADIX * _N / _BLOCKSIZE),
+				 NULL,
+				 &err);
+  assert(err == CL_SUCCESS);
 
   // allocate the auxiliary histogram on GPU
   d_globsum  = clCreateBuffer(Context,
@@ -606,6 +615,14 @@ void CLRadixSort::RecupGPU(void){
   assert (status == CL_SUCCESS);
 
   status = clEnqueueReadBuffer( CommandQueue,
+				d_Offset,
+				CL_TRUE, 0, 
+				sizeof(uint)  * (_RADIX * _N / _BLOCKSIZE),
+				h_Offset,
+				0, NULL, NULL );  
+  assert (status == CL_SUCCESS);
+
+  status = clEnqueueReadBuffer( CommandQueue,
 				d_globsum,
 				CL_TRUE, 0, 
 				sizeof(uint)  * _HISTOSPLIT,
@@ -661,6 +678,14 @@ ostream& operator<<(ostream& os,  CLRadixSort &radi){
     for(uint gr=0;gr<(_N/_BLOCKSIZE);gr++){
       os <<"Radix="<<rad<<" Group="<<gr<<
 	" Satish Histo="<<radi.h_HistoSatish[rad * (_N/_BLOCKSIZE) + gr ]<<endl;
+    }
+  }
+  os<<endl;
+
+  for(uint gr=0;gr<(_N/_BLOCKSIZE);gr++){
+    for(uint rad=0;rad<_RADIX;rad++){
+      os <<"Radix="<<rad<<" Group="<<gr<<
+	" Offset="<<radi.h_Offset[gr * _RADIX + rad ]<<endl;
     }
   }
   os<<endl;
@@ -871,6 +896,135 @@ void CLRadixSort::ScanHistogram(void){
 
 }
 
+// scan the histograms (Satish version)
+void CLRadixSort::ScanSatish(void){
+
+  cl_int err;
+
+  // numbers of processors for the  scan
+  // = half the size of the  histogram
+  size_t nbitems=_RADIX* (_N / _BLOCKSIZE) / 2;
+  size_t nblocitems= nbitems/_HISTOSPLIT ;
+
+
+  int maxmemcache=max(_HISTOSPLIT+1, _RADIX * _N / _BLOCKSIZE / _HISTOSPLIT + 1);
+
+  // scan locally the histogram (the histogram is split into several
+  // parts that fit into the local memory)
+
+  err = clSetKernelArg(ckScanHistogram, 0, sizeof(cl_mem), &d_HistoSatish);
+  assert(err == CL_SUCCESS);
+
+  err  = clSetKernelArg(ckScanHistogram, 1,
+			sizeof(uint)* maxmemcache ,
+			NULL); // mem cache
+
+  err = clSetKernelArg(ckScanHistogram, 2, sizeof(cl_mem), &d_globsum);
+  assert(err == CL_SUCCESS);
+
+  cl_event eve;
+
+  err = clEnqueueNDRangeKernel(CommandQueue,
+			       ckScanHistogram,
+			       1, NULL,
+			       &nbitems,
+			       &nblocitems,
+			       0, NULL, &eve);
+
+  assert(err== CL_SUCCESS);
+  clFinish(CommandQueue); 
+
+  cl_ulong debut,fin;
+
+  err=clGetEventProfilingInfo (eve,
+			   CL_PROFILING_COMMAND_QUEUED,
+			   sizeof(cl_ulong),
+			       (void*) &debut,
+			   NULL);
+  assert(err== CL_SUCCESS);
+
+  err=clGetEventProfilingInfo (eve,
+			   CL_PROFILING_COMMAND_END,
+			   sizeof(cl_ulong),
+			       (void*) &fin,
+			   NULL);
+  assert(err== CL_SUCCESS);
+
+  scan_time += (float) (fin-debut)/1e9;
+
+  // second scan for the globsum
+  err = clSetKernelArg(ckScanHistogram, 0, sizeof(cl_mem), &d_globsum);
+  assert(err == CL_SUCCESS);
+
+  err = clSetKernelArg(ckScanHistogram, 2, sizeof(cl_mem), &d_temp);
+  assert(err == CL_SUCCESS);
+
+  nbitems= _HISTOSPLIT / 2;
+  nblocitems=nbitems;
+
+  err = clEnqueueNDRangeKernel(CommandQueue,
+  			       ckScanHistogram,
+  			       1, NULL,
+  			       &nbitems,
+  			       &nblocitems,
+  			       0, NULL, &eve);
+
+  assert(err== CL_SUCCESS);
+  clFinish(CommandQueue); 
+
+  err=clGetEventProfilingInfo (eve,
+			   CL_PROFILING_COMMAND_QUEUED,
+			   sizeof(cl_ulong),
+			       (void*) &debut,
+			   NULL);
+  assert(err== CL_SUCCESS);
+
+  err=clGetEventProfilingInfo (eve,
+			   CL_PROFILING_COMMAND_END,
+			   sizeof(cl_ulong),
+			       (void*) &fin,
+			   NULL);
+  assert(err== CL_SUCCESS);
+
+  scan_time += (float) (fin-debut)/1e9;
+
+
+  // loops again in order to paste together the local histograms
+  nbitems=_RADIX* (_N / _BLOCKSIZE) / 2;
+  nblocitems= nbitems/_HISTOSPLIT ;
+
+  err = clSetKernelArg(ckPasteHistogram, 0, sizeof(cl_mem), &d_HistoSatish);
+  assert(err == CL_SUCCESS);
+
+  err = clEnqueueNDRangeKernel(CommandQueue,
+  			       ckPasteHistogram,
+  			       1, NULL,
+  			       &nbitems,
+  			       &nblocitems,
+  			       0, NULL, &eve);
+
+  assert(err== CL_SUCCESS);
+  clFinish(CommandQueue);  
+
+  err=clGetEventProfilingInfo (eve,
+			   CL_PROFILING_COMMAND_QUEUED,
+			   sizeof(cl_ulong),
+			       (void*) &debut,
+			   NULL);
+  assert(err== CL_SUCCESS);
+
+  err=clGetEventProfilingInfo (eve,
+			   CL_PROFILING_COMMAND_END,
+			   sizeof(cl_ulong),
+			       (void*) &fin,
+			   NULL);
+  assert(err== CL_SUCCESS);
+
+  scan_time += (float) (fin-debut)/1e9;
+
+
+}
+
 // reorder the data from the scanned histogram
 void CLRadixSort::Reorder(uint pass){
 
@@ -956,6 +1110,85 @@ void CLRadixSort::Reorder(uint pass){
 
 }
 
+// reorder the data from the scanned histogram
+void CLRadixSort::ReorderSatish(uint pass){
+
+
+  cl_int err;
+
+  size_t nblocitems=_BLOCKSIZE;
+  size_t nbitems=_N;
+
+
+  clFinish(CommandQueue);
+
+  err  = clSetKernelArg(ckReorderSatish, 0, sizeof(cl_mem), &d_inKeys);
+  assert(err == CL_SUCCESS);
+
+  err  = clSetKernelArg(ckReorderSatish, 1, sizeof(cl_mem), &d_outKeys);
+  assert(err == CL_SUCCESS);
+
+  err  = clSetKernelArg(ckReorderSatish, 2,
+			sizeof(uint)* _RADIX ,
+			NULL); // mem cache
+  assert(err == CL_SUCCESS);
+
+  err  = clSetKernelArg(ckReorderSatish, 3,
+			sizeof(uint)* _RADIX ,
+			NULL); // mem cache
+
+  err  = clSetKernelArg(ckReorderSatish, 4, sizeof(cl_mem), &d_HistoSatish);
+  assert(err == CL_SUCCESS);
+
+  err  = clSetKernelArg(ckReorderSatish, 5, sizeof(cl_mem), &d_Offset);
+  assert(err == CL_SUCCESS);
+
+  assert(_RADIX == pow(2,_BITS));
+
+  cl_event eve;
+
+  err = clEnqueueNDRangeKernel(CommandQueue,
+			       ckReorderSatish,
+			       1, NULL,
+			       &nbitems,
+			       &nblocitems,
+			       0, NULL, &eve);
+  
+  assert(err== CL_SUCCESS);
+  clFinish(CommandQueue);  
+
+  cl_ulong debut,fin;
+
+  err=clGetEventProfilingInfo (eve,
+			   CL_PROFILING_COMMAND_QUEUED,
+			   sizeof(cl_ulong),
+			       (void*) &debut,
+			   NULL);
+  assert(err== CL_SUCCESS);
+
+  err=clGetEventProfilingInfo (eve,
+			   CL_PROFILING_COMMAND_END,
+			   sizeof(cl_ulong),
+			       (void*) &fin,
+			   NULL);
+  assert(err== CL_SUCCESS);
+
+  reorder_time += (float) (fin-debut)/1e9;
+
+
+
+  // swap the old and new vectors of keys
+  cl_mem d_temp;
+  d_temp=d_inKeys;
+  d_inKeys=d_outKeys;
+  d_outKeys=d_temp;
+
+  // swap the old and new permutations
+  d_temp=d_inPermut;
+  d_inPermut=d_outPermut;
+  d_outPermut=d_temp;
+
+}
 
 // compute the histograms
 void CLRadixSort::SortBlocks(void){
@@ -991,6 +1224,9 @@ void CLRadixSort::SortBlocks(void){
   assert(err == CL_SUCCESS);
 
   err  = clSetKernelArg(ckSortBlock, 4, sizeof(cl_mem), &d_HistoSatish);
+  assert(err == CL_SUCCESS);
+
+  err  = clSetKernelArg(ckSortBlock, 5, sizeof(cl_mem), &d_Offset);
   assert(err == CL_SUCCESS);
 
   cl_event eve;

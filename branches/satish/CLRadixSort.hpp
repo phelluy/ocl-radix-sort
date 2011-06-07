@@ -83,13 +83,16 @@ public:
   void Histogram(uint pass);
   // scan the histograms
   void ScanHistogram(void);
-  // scan the histograms
+  // reorder
   void Reorder(uint pass);
 
   //Satish sorting
   // sort the local blocks
   void SortBlocks(void);
-
+  // scan the histogram
+  void ScanSatish(void);
+  // reorder
+  void ReorderSatish(uint pass);
 
   cl_context Context;             // OpenCL context
   cl_device_id NumDevice;         // OpenCL Device
@@ -100,6 +103,8 @@ public:
 
   uint h_HistoSatish[_RADIX * _N / _BLOCKSIZE]; // histograms on the cpu (Satish)
   cl_mem d_HistoSatish;                   // histograms on the GPU (Satish)
+  uint h_Offset[_RADIX * _N / _BLOCKSIZE]; // offset on the cpu (Satish)
+  cl_mem d_Offset;                   // histograms on the GPU (Satish)
 
   // sum of the local histograms
   uint h_globsum[_HISTOSPLIT];
@@ -127,6 +132,7 @@ public:
   cl_kernel ckScanHistogram; // scan local histogram
   cl_kernel ckPasteHistogram; // paste local histograms
   cl_kernel ckReorder; // final reordering
+  cl_kernel ckReorderSatish; // final reordering
 
   //Satish
   cl_kernel ckSortBlock; // sort local blocks

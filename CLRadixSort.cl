@@ -269,7 +269,8 @@ __kernel void sortblock( __global int* keys,   // the keys to be sorted
 			 __local int* loc_in,  // a copy of the keys in local memory
 			 __local int* loc_out,  // a copy of the keys in local memory
 			 __local int* grhisto, // scanned group histogram
-			 __global int* histo)   // not scanned global histogram
+			 __global int* histo,   // not yet scanned global histogram
+			 __global int* offset)   // offset of the radix of each group
 {   
 
 
@@ -348,12 +349,49 @@ __kernel void sortblock( __global int* keys,   // the keys to be sorted
   // the keys
   keys[ig]=loc_in[it];
 
-  // the histograms
+  // store the histograms and the offset
   if (it < _RADIX) {
     histo[it *(_N/_BLOCKSIZE)+gr]=grhisto[it]; // not coalesced !
+    offset[gr *_RADIX + it]=loc_out[it]; // coalesced 
   }
   barrier(CLK_GLOBAL_MEM_FENCE);
 }  
+
+// reorder step of the Satish algorithm
+// use the scanned histogram and the block offsets to reorder
+// the locally reordered keys
+// many memeory access are coalesced because of the initial ordering
+__kernel void reordersatish( __global int* inkeys,   // the keys to be sorted
+			     __global int* outkeys,  //  the sorted keys 
+			     __local int* locoffset,  // a copy of the offset in local memory
+			     __local int* grhisto, // scanned group histogram
+			     __global int* histo,   //  global scanned histogram
+			     __global int* offset)   // offset of the radix of each group
+{
+  int it = get_local_id(0);
+  int ig = get_global_id(0);
+  int gr=get_group_id(0);
+  int blocksize=get_local_size(0);
+  
+  // store locally the histograms and the offset
+  if (it < _RADIX) {
+    grhisto[it]=histo[it *(_N/_BLOCKSIZE)+gr]; // not coalesced !
+    locoffset[it]=offset[gr *_RADIX + it]; // coalesced 
+  }
+  barrier(CLK_LOCAL_MEM_FENCE);
+
+  int key = inkeys[ig];  
+
+  int gpass=0;
+  int shortkey=(( key >> (gpass * _BITS) ) & (_RADIX-1));  // key radix
+
+  // move the key at the good place, using
+  // the scanned histogram and the offset
+  outkeys[grhisto[shortkey]+it-locoffset[shortkey]]=key;
+
+  barrier(CLK_GLOBAL_MEM_FENCE);
+}  
+
 
 // use the global sum for updating the local histograms
 // each work item updates two values

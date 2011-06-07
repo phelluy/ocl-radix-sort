@@ -257,6 +257,8 @@ int main(void){
   //rs.Sort();
 
   rs.SortBlocks();
+  rs.ScanSatish();
+  rs.ReorderSatish(0);
 
   rs.RecupGPU();
 

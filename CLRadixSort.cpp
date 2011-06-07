@@ -180,6 +180,14 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
 				 &err);
   assert(err == CL_SUCCESS);
 
+  // allocate the Satish histogram on the GPU
+  d_HistoSatish  = clCreateBuffer(Context,
+				 CL_MEM_READ_WRITE,
+				  sizeof(uint)* (_RADIX * _N / _BLOCKSIZE),
+				 NULL,
+				 &err);
+  assert(err == CL_SUCCESS);
+
 
   // allocate the auxiliary histogram on GPU
   d_globsum  = clCreateBuffer(Context,
@@ -205,7 +213,7 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
   err = clSetKernelArg(ckHistogram, 1, sizeof(cl_mem), &d_Histograms);
   assert(err == CL_SUCCESS);
 
-  err = clSetKernelArg(ckHistogram, 3, sizeof(uint)*_RADIX*_ITEMS, NULL);
+  err = clSetKernelArg(ckHistogram, 3, sizeof(uint)*(_RADIX*_ITEMS+1), NULL);
   assert(err == CL_SUCCESS);
 
   err = clSetKernelArg(ckPasteHistogram, 0, sizeof(cl_mem), &d_Histograms);
@@ -218,7 +226,7 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
   assert(err == CL_SUCCESS);
 
   err  = clSetKernelArg(ckReorder, 6,
-			sizeof(uint)* _RADIX * _ITEMS ,
+			sizeof(uint)* (_RADIX * _ITEMS+1) ,
 			NULL); // local cache memory
   assert(err == CL_SUCCESS);
 
@@ -590,6 +598,14 @@ void CLRadixSort::RecupGPU(void){
   assert (status == CL_SUCCESS);
 
   status = clEnqueueReadBuffer( CommandQueue,
+				d_HistoSatish,
+				CL_TRUE, 0, 
+				sizeof(uint)  * (_RADIX * _N / _BLOCKSIZE),
+				h_HistoSatish,
+				0, NULL, NULL );  
+  assert (status == CL_SUCCESS);
+
+  status = clEnqueueReadBuffer( CommandQueue,
 				d_globsum,
 				CL_TRUE, 0, 
 				sizeof(uint)  * _HISTOSPLIT,
@@ -637,6 +653,14 @@ ostream& operator<<(ostream& os,  CLRadixSort &radi){
       for(uint it=0;it<_ITEMS;it++){
 	os <<"Radix="<<rad<<" Group="<<gr<<" Item="<<it<<" Histo="<<radi.h_Histograms[_GROUPS * _ITEMS * rad +_ITEMS * gr+it]<<endl;
       }
+    }
+  }
+  os<<endl;
+
+  for(uint rad=0;rad<_RADIX;rad++){
+    for(uint gr=0;gr<(_N/_BLOCKSIZE);gr++){
+      os <<"Radix="<<rad<<" Group="<<gr<<
+	" Satish Histo="<<radi.h_HistoSatish[rad * (_N/_BLOCKSIZE) + gr ]<<endl;
     }
   }
   os<<endl;
@@ -732,7 +756,7 @@ void CLRadixSort::ScanHistogram(void){
   size_t nblocitems= nbitems/_HISTOSPLIT ;
 
 
-  int maxmemcache=max(_HISTOSPLIT,_ITEMS * _GROUPS * _RADIX / _HISTOSPLIT);
+  int maxmemcache=max(_HISTOSPLIT+1,(_ITEMS * _GROUPS * _RADIX / _HISTOSPLIT + 1));
 
   // scan locally the histogram (the histogram is split into several
   // parts that fit into the local memory)
@@ -952,13 +976,21 @@ void CLRadixSort::SortBlocks(void){
   assert(err == CL_SUCCESS);
 
   err  = clSetKernelArg(ckSortBlock, 1,
-			sizeof(uint) * _BLOCKSIZE ,
+			sizeof(uint) * (_BLOCKSIZE+1) ,
 			NULL); // local cache memory
   assert(err == CL_SUCCESS);
 
   err  = clSetKernelArg(ckSortBlock, 2,
-			sizeof(uint) * 2 * _BLOCKSIZE ,
+			sizeof(uint) * (_BLOCKSIZE+1) ,
 			NULL); // local cache memory
+  assert(err == CL_SUCCESS);
+
+  err  = clSetKernelArg(ckSortBlock, 3,
+			sizeof(uint) * (2 * _BLOCKSIZE+1) ,
+			NULL); // local cache memory
+  assert(err == CL_SUCCESS);
+
+  err  = clSetKernelArg(ckSortBlock, 4, sizeof(cl_mem), &d_HistoSatish);
   assert(err == CL_SUCCESS);
 
   cl_event eve;

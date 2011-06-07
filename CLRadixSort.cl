@@ -171,9 +171,10 @@ __kernel void reorder(const __global int* d_inKeys,
 
 // perform a exclusive parallel prefix sum on an array stored in local
 // memory and return the sum in (*sum)
-// the size of the array HAS to be twice the  number of work-items
+// the size of the array HAS to be twice the  number of work-items +1
+// (the last element contains the total sum)
 // ToDo: the function could be improved by avoiding bank conflicts...  
-void localscan(__local int* temp,int* sum){
+void localscan(__local int* temp){
 
   int it = get_local_id(0);
   int ig = get_global_id(0);
@@ -195,7 +196,7 @@ void localscan(__local int* temp,int* sum){
   // (maybe used in the next step for constructing the global scan)
   // clear the last element
   if (it == 0) {
-    (*sum)=temp[n-1];
+    temp[n]=temp[n-1];
     temp[n - 1] = 0;
   }
                  
@@ -238,11 +239,11 @@ __kernel void scanhistograms( __global int* histo,__local int* temp,__global int
 
   // scan the local vector with
   // the Blelloch's parallel algorithm
-  localscan(temp,&sum);
+  localscan(temp);
 
   // remember the sum for the next scanning step
   if (it == 0){
-    globsum[gr]=sum;
+    globsum[gr]=temp[2 * get_local_size(0)];
   }
   // write results to device memory
 
@@ -265,9 +266,10 @@ __kernel void scanhistograms( __global int* histo,__local int* temp,__global int
 // 2*nitems =  2 * n or
 // nitems = n 
 __kernel void sortblock( __global int* keys,   // the keys to be sorted
-			 __local int* temp,  // a copy of the keys in local memory
-			 __local int* grhisto) // group histogram
-//__global int* histogram)  // global histogram to be scanned
+			 __local int* loc_in,  // a copy of the keys in local memory
+			 __local int* loc_out,  // a copy of the keys in local memory
+			 __local int* grhisto, // scanned group histogram
+			 __global int* histo)   // not scanned global histogram
 {   
 
 
@@ -276,34 +278,81 @@ __kernel void sortblock( __global int* keys,   // the keys to be sorted
   int gr=get_group_id(0);
   int blocksize=get_local_size(0); // see above
   int sum;
+  __local int* temp; // local pointer for memory exchanges
 
-  // sort the local list with a radix=2 sort (or split)
-  // algorithm
+  // load keys into local memory
+  loc_in[it] = keys[ig];  
+  barrier(CLK_LOCAL_MEM_FENCE);
+
+  // sort the local list with a radix=2 sort
+  // also called split algorithm
   for(int pass=0;pass < _BITS;pass++){
-    // load keys into local memory
-    temp[it] = keys[ig];  
-    // init the local histogram
-    grhisto[it]=0;
-    grhisto[blocksize+it]=0;
-
-    barrier(CLK_LOCAL_MEM_FENCE);
     
     // histogram of the pass
     int key,shortkey;
-    key=temp[it];
-    shortkey=( ( key >> pass ) & 1 );  
-    grhisto[shortkey*blocksize+it]=1;
+    key=loc_in[it];
+    shortkey=(( key >> pass ) & 1);  // key bit of the pass
+    grhisto[shortkey*blocksize+it]=1;     // yes
+    grhisto[(1-shortkey)*blocksize+it]=0;  // no
     barrier(CLK_LOCAL_MEM_FENCE);
     
-    // scan the local vector
-    localscan(grhisto,&sum);
+    // scan (exclusive) the local vector
+    // grhisto is of size blocksize+1
+    // the last value is the total sum
+    localscan(grhisto);
     
-    // write results to device memory    
-    keys[grhisto[shortkey*blocksize+it]] = temp[it];  
-    //keys[ig] = grhisto[1*blocksize+it];  
-    barrier(CLK_GLOBAL_MEM_FENCE);
+    // reorder in local memory    
+    loc_out[grhisto[shortkey*blocksize+it]] = loc_in[it];  
+    barrier(CLK_LOCAL_MEM_FENCE);
 
+    // exchange old and new keys into local memory
+    temp=loc_in;
+    loc_in=loc_out;
+    loc_out=temp;
+
+  } // end of split pass
+
+  // now compute the histogram of the group
+  // using the ordered keys and the already used
+  // local memory
+
+  if (it == 0) {
+    loc_out[0]=0;
+    loc_out[_RADIX]=blocksize;
   }
+  else {
+    int key1=loc_in[it-1];
+    int key2=loc_in[it];
+    int gpass=0;
+    int shortkey1=(( key1 >> (gpass * _BITS) ) & (_RADIX-1));  // key1 radix
+    int shortkey2=(( key2 >> (gpass * _BITS) ) & (_RADIX-1));  // key2 radix
+    
+    for(int rad=shortkey1;rad<shortkey2;rad++){
+      loc_out[rad+1]=it;
+    }
+  }
+  barrier(CLK_LOCAL_MEM_FENCE);
+
+  // compute the local histogram
+  if (it < _RADIX) {
+    grhisto[it]=loc_out[it+1]-loc_out[it];
+  }
+  barrier(CLK_LOCAL_MEM_FENCE);
+  
+  // put the results into global memory
+
+  int key=loc_in[it];
+  int gpass=0;
+  int shortkey=(( key >> (gpass * _BITS) ) & (_RADIX-1));  // key radix
+  
+  // the keys
+  keys[ig]=loc_in[it];
+
+  // the histograms
+  if (it < _RADIX) {
+    histo[it *(_N/_BLOCKSIZE)+gr]=grhisto[it]; // not coalesced !
+  }
+  barrier(CLK_GLOBAL_MEM_FENCE);
 }  
 
 // use the global sum for updating the local histograms

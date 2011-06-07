@@ -1301,7 +1301,7 @@ void CLRadixSort::SortBlocks(uint pass){
 			   NULL);
   assert(err== CL_SUCCESS);
 
-  locsort_time += (float) (fin-debut)/1e9;
+  histo_time += (float) (fin-debut)/1e9;
 
 
 }

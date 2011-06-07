@@ -256,9 +256,11 @@ int main(void){
 
   //rs.Sort();
 
-  rs.SortBlocks();
-  rs.ScanSatish();
-  rs.ReorderSatish(0);
+  // rs.SortBlocks(0);
+  // rs.ScanSatish();
+  // rs.ReorderSatish(0);
+
+  rs.SortSatish();
 
   rs.RecupGPU();
 
@@ -272,7 +274,7 @@ int main(void){
 
   // display the data (for debugging)
   if (VERBOSE) {
-    cout << rs;
+    //    cout << rs;
   }
 
   // check the results (debugging)

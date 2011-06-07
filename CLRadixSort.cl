@@ -270,9 +270,9 @@ __kernel void sortblock( __global int* keys,   // the keys to be sorted
 			 __local int* loc_out,  // a copy of the keys in local memory
 			 __local int* grhisto, // scanned group histogram
 			 __global int* histo,   // not yet scanned global histogram
-			 __global int* offset)   // offset of the radix of each group
+			 __global int* offset,   // offset of the radix of each group
+			 const uint gpass)   // # of the pass
 {   
-
 
   int it = get_local_id(0);
   int ig = get_global_id(0);
@@ -292,7 +292,8 @@ __kernel void sortblock( __global int* keys,   // the keys to be sorted
     // histogram of the pass
     int key,shortkey;
     key=loc_in[it];
-    shortkey=(( key >> pass ) & 1);  // key bit of the pass
+    shortkey=(( key >> (gpass * _BITS) ) & (_RADIX-1));
+    shortkey=(( shortkey >> pass ) & 1);  // key bit of the pass
     grhisto[shortkey*blocksize+it]=1;     // yes
     grhisto[(1-shortkey)*blocksize+it]=0;  // no
     barrier(CLK_LOCAL_MEM_FENCE);
@@ -324,7 +325,7 @@ __kernel void sortblock( __global int* keys,   // the keys to be sorted
   else {
     int key1=loc_in[it-1];
     int key2=loc_in[it];
-    int gpass=0;
+    //int gpass=0;
     int shortkey1=(( key1 >> (gpass * _BITS) ) & (_RADIX-1));  // key1 radix
     int shortkey2=(( key2 >> (gpass * _BITS) ) & (_RADIX-1));  // key2 radix
     
@@ -343,7 +344,7 @@ __kernel void sortblock( __global int* keys,   // the keys to be sorted
   // put the results into global memory
 
   int key=loc_in[it];
-  int gpass=0;
+  //int gpass=0;
   int shortkey=(( key >> (gpass * _BITS) ) & (_RADIX-1));  // key radix
   
   // the keys
@@ -361,13 +362,15 @@ __kernel void sortblock( __global int* keys,   // the keys to be sorted
 // use the scanned histogram and the block offsets to reorder
 // the locally reordered keys
 // many memeory access are coalesced because of the initial ordering
-__kernel void reordersatish( __global int* inkeys,   // the keys to be sorted
+__kernel void reordersatish( const __global int* inkeys,   // the keys to be sorted
 			     __global int* outkeys,  //  the sorted keys 
 			     __local int* locoffset,  // a copy of the offset in local memory
 			     __local int* grhisto, // scanned group histogram
-			     __global int* histo,   //  global scanned histogram
-			     __global int* offset)   // offset of the radix of each group
+			     const __global int* histo,   //  global scanned histogram
+			     const __global int* offset,   // offset of the radix of each group
+			     const uint gpass)   // # of the pass
 {
+
   int it = get_local_id(0);
   int ig = get_global_id(0);
   int gr=get_group_id(0);
@@ -382,7 +385,6 @@ __kernel void reordersatish( __global int* inkeys,   // the keys to be sorted
 
   int key = inkeys[ig];  
 
-  int gpass=0;
   int shortkey=(( key >> (gpass * _BITS) ) & (_RADIX-1));  // key radix
 
   // move the key at the good place, using
@@ -395,7 +397,7 @@ __kernel void reordersatish( __global int* inkeys,   // the keys to be sorted
 
 // use the global sum for updating the local histograms
 // each work item updates two values
-__kernel void pastehistograms( __global int* histo,__global int* globsum){
+__kernel void pastehistograms( __global int* histo,const __global int* globsum){
 
 
   int ig = get_global_id(0);

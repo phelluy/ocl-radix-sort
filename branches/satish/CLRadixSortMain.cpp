@@ -260,8 +260,11 @@ int main(void){
   // rs.ScanSatish();
   // rs.ReorderSatish(0);
 
+#ifdef SATISH
   rs.SortSatish();
-  //rs.Sort();
+#else
+  rs.Sort();
+#endif
 
   rs.RecupGPU();
 

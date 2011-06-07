@@ -230,14 +230,14 @@ __kernel void scanhistograms( __global int* histo,__local int* temp,__global int
   int gr=get_group_id(0);
   int sum;
 
-  // load input into local memory
-  // up sweep phase
+  // load a part of the histogram into local memory
   temp[2*it] = histo[2*ig];  
   temp[2*it+1] = histo[2*ig+1];  
   barrier(CLK_LOCAL_MEM_FENCE);
 
 
-  // scan the local vector
+  // scan the local vector with
+  // the Blelloch's parallel algorithm
   localscan(temp,&sum);
 
   // remember the sum for the next scanning step

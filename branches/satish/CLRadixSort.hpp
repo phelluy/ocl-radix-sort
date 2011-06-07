@@ -88,11 +88,14 @@ public:
 
   //Satish sorting
   // sort the local blocks
-  void SortBlocks(void);
+  void SortBlocks(uint pass);
   // scan the histogram
   void ScanSatish(void);
   // reorder
   void ReorderSatish(uint pass);
+  // sort with Satish algo
+  void SortSatish(void);
+
 
   cl_context Context;             // OpenCL context
   cl_device_id NumDevice;         // OpenCL Device

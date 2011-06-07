@@ -382,7 +382,6 @@ void CLRadixSort::Transpose(int nbrow,int nbcol){
 }
 
 // global sorting algorithm
-
 void CLRadixSort::Sort(){
 
   assert(nkeys_rounded <= _N);
@@ -432,6 +431,40 @@ void CLRadixSort::Sort(){
   }
 }
 
+// global sorting algorithm (Satish version)
+void CLRadixSort::SortSatish(){
+
+  assert(nkeys_rounded <= _N);
+  assert(nkeys <= nkeys_rounded);
+  int nbcol=nkeys_rounded/(_GROUPS * _ITEMS);
+  int nbrow= _GROUPS * _ITEMS;
+
+  if (VERBOSE){
+    cout << "Start storting "<<nkeys<< " keys (Satish)"<<endl;
+  }
+
+  for(uint pass=0;pass<_PASS;pass++){
+    if (VERBOSE) {
+      cout << "pass "<<pass<<endl;
+    }
+    if (VERBOSE) {
+      cout << "Build histograms "<<endl;
+    }
+    SortBlocks(pass);
+    if (VERBOSE) {
+      cout << "Scan histograms "<<endl;
+    }
+    ScanSatish();
+    if (VERBOSE) {
+      cout << "Reorder "<<endl;
+    }
+    ReorderSatish(pass);
+  }
+  sort_time=histo_time+scan_time+reorder_time+transpose_time;
+  if (VERBOSE){
+    cout << "End sorting"<<endl;
+  }
+}
 
 // check the computation at the end
 void CLRadixSort::Check(){
@@ -1143,6 +1176,12 @@ void CLRadixSort::ReorderSatish(uint pass){
   err  = clSetKernelArg(ckReorderSatish, 5, sizeof(cl_mem), &d_Offset);
   assert(err == CL_SUCCESS);
 
+
+
+  err  = clSetKernelArg(ckReorderSatish, 6, sizeof(uint), &pass);
+  assert(err == CL_SUCCESS);
+
+
   assert(_RADIX == pow(2,_BITS));
 
   cl_event eve;
@@ -1191,7 +1230,7 @@ void CLRadixSort::ReorderSatish(uint pass){
 }
 
 // compute the histograms
-void CLRadixSort::SortBlocks(void){
+void CLRadixSort::SortBlocks(uint pass){
 
   cl_int err;
 
@@ -1227,6 +1266,9 @@ void CLRadixSort::SortBlocks(void){
   assert(err == CL_SUCCESS);
 
   err  = clSetKernelArg(ckSortBlock, 5, sizeof(cl_mem), &d_Offset);
+  assert(err == CL_SUCCESS);
+
+  err  = clSetKernelArg(ckSortBlock, 6, sizeof(int), &pass);
   assert(err == CL_SUCCESS);
 
   cl_event eve;

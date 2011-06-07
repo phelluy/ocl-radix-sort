@@ -11,8 +11,8 @@
 #define _ITEMS  4 // number of items in a group
 #define _GROUPS 16 // the number of virtual processors is _ITEMS * _GROUPS
 #define  _HISTOSPLIT 2 // number of splits of the histogram
-#define _TOTALBITS 1  // number of bits for the integer in the list (max=32)
-#define _BITS 1  // number of bits in the radix
+#define _TOTALBITS 3  // number of bits for the integer in the list (max=32)
+#define _BITS 3  // number of bits in the radix
 #define _SMALLBITS 1  //  number of bits in the small radix (=1 for a split algorithm)
 #define _BLOCKSIZE 64  // size of the sorted blocks in the Satish algorithm
 // max size of the sorted vector

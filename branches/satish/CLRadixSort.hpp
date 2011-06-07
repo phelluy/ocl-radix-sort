@@ -95,13 +95,17 @@ public:
   cl_device_id NumDevice;         // OpenCL Device
   cl_command_queue CommandQueue;     // OpenCL command queue 
   cl_program Program;                // OpenCL program
-  uint h_Histograms[_RADIX * _GROUPS * _ITEMS]; // histograms on the cpu
-  cl_mem d_Histograms;                   // histograms on the GPU
+  uint h_Histograms[_RADIX * _GROUPS * _ITEMS]; // histograms on the cpu (Blelloch)
+  cl_mem d_Histograms;                   // histograms on the GPU (Blelloch)
+
+  uint h_HistoSatish[_RADIX * _N / _BLOCKSIZE]; // histograms on the cpu (Satish)
+  cl_mem d_HistoSatish;                   // histograms on the GPU (Satish)
 
   // sum of the local histograms
   uint h_globsum[_HISTOSPLIT];
   cl_mem d_globsum;
   cl_mem d_temp;  // in case where the sum is not needed
+
 
   // list of keys
   uint nkeys; // actual number of keys

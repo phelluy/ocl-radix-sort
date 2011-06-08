@@ -90,6 +90,7 @@ int main(void){
   }
 
   NumPlatform=NbPlatforms-1;
+  //NumPlatform=0;
   assert(NumPlatform < NbPlatforms);
 
 
@@ -257,6 +258,8 @@ int main(void){
   //rs.Sort();
 
   // rs.SortBlocks(0);
+  // cout << rs.histo_time;
+  // assert(1==2);
   // rs.ScanSatish();
   // rs.ReorderSatish(0);
 

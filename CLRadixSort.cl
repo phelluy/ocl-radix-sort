@@ -3,6 +3,16 @@
 // thus we simulate the #include "CLRadixSortParam.hpp" by
 // string manipulations
 
+#define NUM_BANKS 16 
+#define LOG_NUM_BANKS 4 
+#ifdef ZERO_BANK_CONFLICTS 
+#define CONFLICT_FREE_OFFSET(n) \ 
+    ((n) >> NUM_BANKS + (n) >> (2 * LOG_NUM_BANKS)) 
+#else 
+#define CONFLICT_FREE_OFFSET(n) ((n) >> LOG_NUM_BANKS) 
+#endif
+
+
 // compute the histogram for each radix and each virtual processor for the pass
 __kernel void histogram(const __global int* d_Keys,
 			__global int* d_Histograms,
@@ -174,6 +184,8 @@ __kernel void reorder(const __global int* d_inKeys,
 // the size of the array HAS to be twice the  number of work-items +1
 // (the last element contains the total sum)
 // ToDo: the function could be improved by avoiding bank conflicts...  
+
+
 void localscan(__local int* temp){
 
   int it = get_local_id(0);
@@ -190,6 +202,7 @@ void localscan(__local int* temp){
       temp[bi] += temp[ai];  
     }  
     decale *= 2; 
+    //barrier(CLK_LOCAL_MEM_FENCE);  
   }
   
   // store the last element in the global sum vector
@@ -213,6 +226,7 @@ void localscan(__local int* temp){
       temp[ai] = temp[bi];  
       temp[bi] += t;   
     }  
+    //barrier(CLK_LOCAL_MEM_FENCE);
 
   }  
   barrier(CLK_LOCAL_MEM_FENCE);
@@ -339,7 +353,7 @@ __kernel void sortblock( __global int* keys,   // the keys to be sorted
   if (it < _RADIX) {
     grhisto[it]=loc_out[it+1]-loc_out[it];
   }
-  barrier(CLK_LOCAL_MEM_FENCE);
+  //barrier(CLK_LOCAL_MEM_FENCE);
   
   // put the results into global memory
 
@@ -355,7 +369,7 @@ __kernel void sortblock( __global int* keys,   // the keys to be sorted
     histo[it *(_N/_BLOCKSIZE)+gr]=grhisto[it]; // not coalesced !
     offset[gr *_RADIX + it]=loc_out[it]; // coalesced 
   }
-  barrier(CLK_GLOBAL_MEM_FENCE);
+  //barrier(CLK_GLOBAL_MEM_FENCE);
 }  
 
 // reorder step of the Satish algorithm

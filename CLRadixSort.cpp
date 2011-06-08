@@ -185,17 +185,17 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
   // allocate the Satish histogram on the GPU
   d_HistoSatish  = clCreateBuffer(Context,
 				 CL_MEM_READ_WRITE,
-				  sizeof(uint)* (_RADIX * _N / _BLOCKSIZE),
+				  sizeof(uint)* (_RADIX * (_N / _BLOCKSIZE)),
 				 NULL,
 				 &err);
   assert(err == CL_SUCCESS);
 
   // allocate the Offset on the GPU
   d_Offset  = clCreateBuffer(Context,
-				 CL_MEM_READ_WRITE,
-				  sizeof(uint)* (_RADIX * _N / _BLOCKSIZE),
-				 NULL,
-				 &err);
+			     CL_MEM_READ_WRITE,
+			     sizeof(uint)* (_RADIX * (_N / _BLOCKSIZE)),
+			     NULL,
+			     &err);
   assert(err == CL_SUCCESS);
 
   // allocate the auxiliary histogram on GPU
@@ -642,7 +642,7 @@ void CLRadixSort::RecupGPU(void){
   status = clEnqueueReadBuffer( CommandQueue,
 				d_HistoSatish,
 				CL_TRUE, 0, 
-				sizeof(uint)  * (_RADIX * _N / _BLOCKSIZE),
+				sizeof(uint)  * (_RADIX * (_N / _BLOCKSIZE)),
 				h_HistoSatish,
 				0, NULL, NULL );  
   assert (status == CL_SUCCESS);
@@ -650,7 +650,7 @@ void CLRadixSort::RecupGPU(void){
   status = clEnqueueReadBuffer( CommandQueue,
 				d_Offset,
 				CL_TRUE, 0, 
-				sizeof(uint)  * (_RADIX * _N / _BLOCKSIZE),
+				sizeof(uint)  * (_RADIX * (_N / _BLOCKSIZE)),
 				h_Offset,
 				0, NULL, NULL );  
   assert (status == CL_SUCCESS);
@@ -940,7 +940,7 @@ void CLRadixSort::ScanSatish(void){
   size_t nblocitems= nbitems/_HISTOSPLIT ;
 
 
-  int maxmemcache=max(_HISTOSPLIT+1, _RADIX * _N / _BLOCKSIZE / _HISTOSPLIT + 1);
+  int maxmemcache=max(_HISTOSPLIT+1, _RADIX * (_N / _BLOCKSIZE / _HISTOSPLIT) + 1);
 
   // scan locally the histogram (the histogram is split into several
   // parts that fit into the local memory)

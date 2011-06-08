@@ -104,9 +104,9 @@ public:
   uint h_Histograms[_RADIX * _GROUPS * _ITEMS]; // histograms on the cpu (Blelloch)
   cl_mem d_Histograms;                   // histograms on the GPU (Blelloch)
 
-  uint h_HistoSatish[_RADIX * _N / _BLOCKSIZE]; // histograms on the cpu (Satish)
+  uint h_HistoSatish[_RADIX * (_N / _BLOCKSIZE)]; // histograms on the cpu (Satish)
   cl_mem d_HistoSatish;                   // histograms on the GPU (Satish)
-  uint h_Offset[_RADIX * _N / _BLOCKSIZE]; // offset on the cpu (Satish)
+  uint h_Offset[_RADIX * (_N / _BLOCKSIZE)]; // offset on the cpu (Satish)
   cl_mem d_Offset;                   // histograms on the GPU (Satish)
 
   // sum of the local histograms

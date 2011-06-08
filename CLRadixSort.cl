@@ -301,32 +301,32 @@ __kernel void sortblock( __global int* keys,   // the keys to be sorted
 
   // sort the local list with a radix=2 sort
   // also called split algorithm
-  for(int pass=0;pass < _BITS;pass++){
+  // for(int pass=0;pass < _BITS;pass++){
     
-    // histogram of the pass
-    int key,shortkey;
-    key=loc_in[it];
-    shortkey=(( key >> (gpass * _BITS) ) & (_RADIX-1));
-    shortkey=(( shortkey >> pass ) & 1);  // key bit of the pass
-    grhisto[shortkey*blocksize+it]=1;     // yes
-    grhisto[(1-shortkey)*blocksize+it]=0;  // no
-    barrier(CLK_LOCAL_MEM_FENCE);
+  //   // histogram of the pass
+  //   int key,shortkey;
+  //   key=loc_in[it];
+  //   shortkey=(( key >> (gpass * _BITS) ) & (_RADIX-1));
+  //   shortkey=(( shortkey >> pass ) & 1);  // key bit of the pass
+  //   grhisto[shortkey*blocksize+it]=1;     // yes
+  //   grhisto[(1-shortkey)*blocksize+it]=0;  // no
+  //   barrier(CLK_LOCAL_MEM_FENCE);
     
-    // scan (exclusive) the local vector
-    // grhisto is of size blocksize+1
-    // the last value is the total sum
-    localscan(grhisto);
+  //   // scan (exclusive) the local vector
+  //   // grhisto is of size blocksize+1
+  //   // the last value is the total sum
+  //   localscan(grhisto);
     
-    // reorder in local memory    
-    loc_out[grhisto[shortkey*blocksize+it]] = loc_in[it];  
-    barrier(CLK_LOCAL_MEM_FENCE);
+  //   // reorder in local memory    
+  //   loc_out[grhisto[shortkey*blocksize+it]] = loc_in[it];  
+  //   barrier(CLK_LOCAL_MEM_FENCE);
 
-    // exchange old and new keys into local memory
-    temp=loc_in;
-    loc_in=loc_out;
-    loc_out=temp;
+  //   // exchange old and new keys into local memory
+  //   temp=loc_in;
+  //   loc_in=loc_out;
+  //   loc_out=temp;
 
-  } // end of split pass
+  // } // end of split pass
 
   // now compute the histogram of the group
   // using the ordered keys and the already used

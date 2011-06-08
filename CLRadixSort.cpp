@@ -135,6 +135,11 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
     h_checkKeys[i]=h_Keys[i];
   }
 
+  //sort each block (for debugging)
+  for(int i=0;i<_N;i+= _BLOCKSIZE){
+    sort(h_Keys+i,h_Keys+i+_BLOCKSIZE);
+  }
+
   // construction of the initial permutation
   for(uint i = 0; i < _N; i++){
     h_Permut[i] = i;

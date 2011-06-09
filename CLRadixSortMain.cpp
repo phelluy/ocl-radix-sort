@@ -221,7 +221,7 @@ int main(void){
 
   cout << "Radix="<<_RADIX<<endl;
   cout << "Max Int="<<(uint) _MAXINT <<endl;
-  cout << "Local Memory="<<rs.LocalMemSize<<"kb"<<endl;
+  cout << "Local Memory="<<rs.LocalMemSize<<" Bytes"<<endl;
   cout << "Max work-group size="<<rs.MaxWorkGroupSize<<endl;
     
   // sort

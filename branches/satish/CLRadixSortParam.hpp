@@ -13,7 +13,7 @@
 #define  _HISTOSPLIT 512 // number of splits of the histogram
 #define _TOTALBITS 8  // number of bits for the integer in the list (max=32)
 #define _BITS 4  // number of bits in the radix
-#define _SMALLBITS 1  //  number of bits in the small radix (=1 for a split algorithm)
+#define _SMALLBITS 2  //  number of bits in the small radix (=1 for a split algorithm)
 #define _BLOCKSIZE 512  // size of the sorted blocks in the Satish algorithm
 // max size of the sorted vector
 // it has to be divisible by  _ITEMS * _GROUPS

@@ -8,10 +8,10 @@
 // they are included in the class AND in the OpenCL kernels
 ///////////////////////////////////////////////////////
 // these parameters can be changed
-#define _ITEMS  128 // number of items in a group
+#define _ITEMS  64 // number of items in a group
 #define _GROUPS 64 // the number of virtual processors is _ITEMS * _GROUPS
 #define  _HISTOSPLIT 512 // number of splits of the histogram
-#define _TOTALBITS 5  // number of bits for the integer in the list (max=32)
+#define _TOTALBITS 30  // number of bits for the integer in the list (max=32)
 #define _BITS 5  // number of bits in the radix
 #define _SMALLBITS 1  //  number of bits in the small radix (=1 for a split algorithm)
 #define _BLOCKSIZE 512  // size of the sorted blocks in the Satish algorithm

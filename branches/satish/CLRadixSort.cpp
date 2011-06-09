@@ -975,7 +975,7 @@ void CLRadixSort::ScanSatish(void){
   int maxmemcache=max(_HISTOSPLIT+1, _RADIX * ((_N / _BLOCKSIZE) / _HISTOSPLIT) + 1);
 
   // increase the needed cache in case of bank conflict trick
-  cout << maxmemcache <<" "<<_D(maxmemcache)<<endl;
+  //cout << maxmemcache <<" "<<_D(maxmemcache)<<endl;
   maxmemcache = _D(maxmemcache);
 
   // check that we have enough memory

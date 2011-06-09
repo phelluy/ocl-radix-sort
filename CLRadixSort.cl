@@ -351,7 +351,6 @@ __kernel void sortblock( __global int* keys,   // the keys to be sorted
 
   // load keys into local memory
   loc_in[it] = keys[ig];  
-  barrier(CLK_LOCAL_MEM_FENCE);
 
   // sort the local list with a radix=2 sort
   // also called split algorithm
@@ -361,6 +360,7 @@ __kernel void sortblock( __global int* keys,   // the keys to be sorted
     for (int rad=0;rad<_SMALLRADIX;rad++){
       grhisto[_D(rad*blocksize+it)]=0;
     }
+    barrier(CLK_LOCAL_MEM_FENCE);
     
     // histogram of the pass
     int key,shortkey;

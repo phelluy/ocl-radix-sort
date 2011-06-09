@@ -178,21 +178,6 @@ int main(void){
     cout << "Sort on GPU"<<endl;
   }
 
-  // mémoire cache du  device
-  cl_ulong memcache;
-  status = clGetDeviceInfo(
-			   Devices[NumDevice],
-			   CL_DEVICE_LOCAL_MEM_SIZE,
-			   sizeof(cl_ulong),
-			   (void*)&memcache,
-			   NULL);
-  assert (status == CL_SUCCESS);
-
-  cout << "GPU cache="<<memcache<<endl;
-  cout << "Needed cache="<< _ITEMS*_RADIX*sizeof(int)<<endl;
-
-  assert(_ITEMS*_RADIX*sizeof(int) < memcache);
-
   // compute units number
   cl_int cores;
   status = clGetDeviceInfo(
@@ -236,7 +221,9 @@ int main(void){
 
   cout << "Radix="<<_RADIX<<endl;
   cout << "Max Int="<<(uint) _MAXINT <<endl;
-
+  cout << "Local Memory="<<rs.LocalMemSize<<"kb"<<endl;
+  cout << "Max work-group size="<<rs.MaxWorkGroupSize<<endl;
+    
   // sort
 
   // test a non power of two size list
@@ -258,6 +245,8 @@ int main(void){
   //rs.Sort();
 
   // rs.SortBlocks(0);
+  // rs.RecupGPU();
+  // //cout << rs;
   // cout << rs.histo_time;
   // assert(1==2);
   // rs.ScanSatish();
@@ -281,7 +270,7 @@ int main(void){
 
   // display the data (for debugging)
   if (VERBOSE) {
-    //    cout << rs;
+    //cout << rs;
   }
 
   // check the results (debugging)

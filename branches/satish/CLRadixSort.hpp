@@ -37,6 +37,7 @@ typedef cl_uint uint;
 #include<assert.h>
 #include<math.h>
 #include <stdlib.h>
+#include <algorithm>
 
 using namespace std;
 
@@ -101,6 +102,8 @@ public:
   cl_device_id NumDevice;         // OpenCL Device
   cl_command_queue CommandQueue;     // OpenCL command queue 
   cl_program Program;                // OpenCL program
+  cl_ulong LocalMemSize;         // cache memory size of the CUs
+  size_t MaxWorkGroupSize;   // maximal size of the work groups
   uint h_Histograms[_RADIX * _GROUPS * _ITEMS]; // histograms on the cpu (Blelloch)
   cl_mem d_Histograms;                   // histograms on the GPU (Blelloch)
 

@@ -182,13 +182,12 @@ __kernel void reorder(const __global int* d_inKeys,
 // (the last element contains the total sum)
 // ToDo: the function could be improved by avoiding bank conflicts...  
 
-
-void localscan(__local int* temp){
+void localscan2(__local int* temp,int n){
 
   int it = get_local_id(0);
   int ig = get_global_id(0);
   int decale = 1; 
-  int n=get_local_size(0) * 2 ;
+  //int n=get_local_size(0) * 2 ;
  	
   // parallel prefix sum (algorithm of Blelloch 1990) 
   for (int d = n>>1; d > 0; d >>= 1){   
@@ -198,7 +197,7 @@ void localscan(__local int* temp){
       int bi = decale*(2*it+2)-1;  	
       temp[_D(bi)] += temp[_D(ai)];  
     }  
-    decale *= 2; 
+    decale <<= 1; 
     //barrier(CLK_LOCAL_MEM_FENCE);  
   }
   
@@ -230,6 +229,64 @@ void localscan(__local int* temp){
 }
 
 
+// same as before but the size of the vector can of the form
+// n = 2^p0 nw with nw = work group size
+//  p0=1 in the previous algorithm
+void localscan(__local int* temp,int n){
+
+  int it = get_local_id(0);
+  int ig = get_global_id(0);
+  int nw=get_local_size(0);
+  int small = n/nw/2;  // small = 2^(p0-1) =2 si p0=2
+  for(int i=1;i<small;i++){
+    temp[_D(small*it+i)]+=temp[_D(small*it+i-1)];
+  };
+ 	
+  int decale = small; 
+  // parallel prefix sum (algorithm of Blelloch 1990) 
+  for (int d = nw; d > 0; d >>= 1){   
+    barrier(CLK_LOCAL_MEM_FENCE);  
+    if (it < d){  
+      int ai = decale*(2*it+1)-1;  
+      int bi = decale*(2*it+2)-1;  	
+      temp[_D(bi)] += temp[_D(ai)];  
+    }  
+    decale <<= 1; 
+    //barrier(CLK_LOCAL_MEM_FENCE);  
+  }
+  
+  // store the last element in the global sum vector
+  // (maybe used in the next step for constructing the global scan)
+  // clear the last element
+  if (it == 0) {
+    temp[_D(n)]=temp[_D(n-1)];
+    temp[_D(n - 1)] = 0;
+  }
+                 
+  // down sweep phase
+  for (int d = 1; d <= nw; d *= 2){  
+    decale >>= 1;  
+    barrier(CLK_LOCAL_MEM_FENCE);
+
+    if (it < d){  
+      int ai = decale*(2*it+1)-1;  
+      int bi = decale*(2*it+2)-1;  
+         
+      int t = temp[_D(ai)];  
+      temp[_D(ai)] = temp[_D(bi)];  
+      temp[_D(bi)] += t;   
+    }  
+    //barrier(CLK_LOCAL_MEM_FENCE);
+
+  }  
+  barrier(CLK_LOCAL_MEM_FENCE);
+  for(int i=small-1;i>0;i--){
+    temp[_D(small*it+i)]=temp[_D(small*it+i-1)]+temp[_D(small*it)];
+  };
+  barrier(CLK_LOCAL_MEM_FENCE);
+
+}
+
 
 // perform a parallel prefix sum (a scan) on the local histograms
 // (see Blelloch 1990) each workitem worries about two memories
@@ -250,7 +307,7 @@ __kernel void scanhistograms( __global int* histo,__local int* temp,__global int
 
   // scan the local vector with
   // the Blelloch's parallel algorithm
-  localscan(temp);
+  localscan(temp,2*get_local_size(0));
 
   // remember the sum for the next scanning step
   if (it == 0){
@@ -298,21 +355,25 @@ __kernel void sortblock( __global int* keys,   // the keys to be sorted
 
   // sort the local list with a radix=2 sort
   // also called split algorithm
-  for(int pass=0;pass < _BITS;pass++){
+  for(int pass=0;pass < _BITS;pass+=_SMALLBITS){
+
+    // init histogram to zero
+    for (int rad=0;rad<_SMALLRADIX;rad++){
+      grhisto[_D(rad*blocksize+it)]=0;
+    }
     
     // histogram of the pass
     int key,shortkey;
     key=loc_in[it];
     shortkey=(( key >> (gpass * _BITS) ) & (_RADIX-1));
-    shortkey=(( shortkey >> pass ) & 1);  // key bit of the pass
-    grhisto[_D(shortkey*blocksize+it)]=1;     // yes
-    grhisto[_D((1-shortkey)*blocksize+it)]=0;  // no
+    shortkey=(( shortkey >> (pass * _SMALLBITS) ) & (_SMALLRADIX-1));  // key bit of the pass
+    grhisto[_D(shortkey*blocksize+it)]++;     // yes
     barrier(CLK_LOCAL_MEM_FENCE);
     
     // scan (exclusive) the local vector
     // grhisto is of size blocksize+1
     // the last value is the total sum
-    localscan(grhisto);
+    localscan(grhisto,_SMALLRADIX*blocksize);
     
     // reorder in local memory    
     loc_out[grhisto[_D(shortkey*blocksize+it)]] = loc_in[it];  

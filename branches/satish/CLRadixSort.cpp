@@ -106,7 +106,7 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
   // if not successful display the errors 
   if (err != CL_SUCCESS) { 
     size_t len;
-    char buffer[2048];
+    char buffer[20480];
     cout << "failed to build program executable"<<endl;
     clGetProgramBuildInfo(Program, NumDevice, CL_PROGRAM_BUILD_LOG, sizeof(buffer), buffer, &len);
     cout << endl<< buffer<<endl;
@@ -1307,7 +1307,7 @@ void CLRadixSort::SortBlocks(uint pass){
 
 
   // size of the local histogram
-  cachesize=2 * _BLOCKSIZE + 1;
+  cachesize=_SMALLRADIX * _BLOCKSIZE + 1;
   // takes into account the bank conflict trick
   cachesize =_D(cachesize);
 

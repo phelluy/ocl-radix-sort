@@ -376,7 +376,8 @@ __kernel void sortblock( __global int* keys,   // the keys to be sorted
     localscan(grhisto,_SMALLRADIX*blocksize);
     
     // reorder in local memory    
-    loc_out[grhisto[_D(shortkey*blocksize+it)]] = loc_in[it];  
+    loc_out[grhisto[_D(shortkey*blocksize+it)]] = loc_in[it];
+    grhisto[_D(shortkey*blocksize+it)]++;  
     barrier(CLK_LOCAL_MEM_FENCE);
 
     // exchange old and new keys into local memory

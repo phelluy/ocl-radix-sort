@@ -366,7 +366,7 @@ __kernel void sortblock( __global int* keys,   // the keys to be sorted
     int key,shortkey;
     key=loc_in[it];
     shortkey=(( key >> (gpass * _BITS) ) & (_RADIX-1));
-    shortkey=(( shortkey >> (pass * _SMALLBITS) ) & (_SMALLRADIX-1));  // key bit of the pass
+    shortkey=(( shortkey >> pass  ) & (_SMALLRADIX-1));  // key bit of the pass
     grhisto[_D(shortkey*blocksize+it)]++;     // yes
     barrier(CLK_LOCAL_MEM_FENCE);
     

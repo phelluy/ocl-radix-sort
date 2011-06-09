@@ -1342,7 +1342,8 @@ void CLRadixSort::SortBlocks(uint pass){
 			       &nblocitems,
 			       0, NULL, &eve);
 
-  assert(err== CL_SUCCESS);
+  //cout << err<<" , "<<CL_INVALID_VALUE<<endl;
+  assert(err == CL_SUCCESS);
 
   clFinish(CommandQueue);
 
@@ -1353,7 +1354,8 @@ void CLRadixSort::SortBlocks(uint pass){
 			   sizeof(cl_ulong),
 			       (void*) &debut,
 			   NULL);
-  //cout << err<<" , "<<CL_PROFILING_INFO_NOT_AVAILABLE<<endl;
+  // cout << err<<" , "<<CL_PROFILING_INFO_NOT_AVAILABLE<<endl;
+  // cout << err<<" , "<<CL_INVALID_VALUE<<endl;
   assert(err== CL_SUCCESS);
 
   err=clGetEventProfilingInfo (eve,

@@ -965,16 +965,17 @@ void CLRadixSort::ScanSatish(void){
 
   // numbers of processors for the  scan
   // = half the size of the  histogram
-  size_t nbitems=_RADIX* (_N / _BLOCKSIZE / 2);
+  size_t nbitems=_RADIX* (_N / _BLOCKSIZE ) / 2;
   size_t nblocitems= nbitems/_HISTOSPLIT ;
 
   assert(nblocitems != 0);
   assert(nblocitems <= MaxWorkGroupSize);
 
 
-  int maxmemcache=max(_HISTOSPLIT+1, _RADIX * (_N / _BLOCKSIZE / _HISTOSPLIT) + 1);
+  int maxmemcache=max(_HISTOSPLIT+1, _RADIX * ((_N / _BLOCKSIZE) / _HISTOSPLIT) + 1);
 
   // increase the needed cache in case of bank conflict trick
+  cout << maxmemcache <<" "<<_D(maxmemcache)<<endl;
   maxmemcache = _D(maxmemcache);
 
   // check that we have enough memory
@@ -1211,7 +1212,7 @@ void CLRadixSort::ReorderSatish(uint pass){
   assert(err == CL_SUCCESS);
 
   err  = clSetKernelArg(ckReorderSatish, 3,
-			sizeof(uint)* _RADIX ,
+			sizeof(uint)* _RADIX,
 			NULL); // mem cache
 
   err  = clSetKernelArg(ckReorderSatish, 4, sizeof(cl_mem), &d_HistoSatish);
@@ -1295,23 +1296,23 @@ void CLRadixSort::SortBlocks(uint pass){
   assert(err == CL_SUCCESS);
 
   err  = clSetKernelArg(ckSortBlock, 1,
-			sizeof(uint) * (_BLOCKSIZE+1) ,
+			sizeof(uint) * _BLOCKSIZE ,
 			NULL); // local cache memory
   assert(err == CL_SUCCESS);
 
   err  = clSetKernelArg(ckSortBlock, 2,
-			sizeof(uint) * (_BLOCKSIZE+1) ,
+			sizeof(uint) * _BLOCKSIZE ,
 			NULL); // local cache memory
   assert(err == CL_SUCCESS);
 
 
   // size of the local histogram
-  cachesize=2 * _BLOCKSIZE+1;
+  cachesize=2 * _BLOCKSIZE + 1;
   // takes into account the bank conflict trick
   cachesize =_D(cachesize);
 
   // check that we have enough memory
-  assert(LocalMemSize > sizeof(cl_uint)*cachesize);
+  assert(LocalMemSize > sizeof(cl_uint)*(cachesize+2*_BLOCKSIZE));
 
 
   err  = clSetKernelArg(ckSortBlock, 3,

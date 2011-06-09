@@ -11,7 +11,7 @@
 #define _ITEMS  128 // number of items in a group
 #define _GROUPS 64 // the number of virtual processors is _ITEMS * _GROUPS
 #define  _HISTOSPLIT 512 // number of splits of the histogram
-#define _TOTALBITS 30  // number of bits for the integer in the list (max=32)
+#define _TOTALBITS 5  // number of bits for the integer in the list (max=32)
 #define _BITS 5  // number of bits in the radix
 #define _SMALLBITS 1  //  number of bits in the small radix (=1 for a split algorithm)
 #define _BLOCKSIZE 512  // size of the sorted blocks in the Satish algorithm
@@ -25,7 +25,7 @@
 //#define PERMUT  // store the final permutation
 ////////////////////////////////////////////////////////
 #define SATISH
-//#define _BITONIC
+//#define _BITONIC // works only if _BITS == _TOTALBITS !
 
 // the following parameters are computed from the previous
 #define _RADIX (1 << _BITS) //  radix  = 2^_BITS
@@ -40,11 +40,11 @@
 #define NUM_BANKS 16 
 #define LOG_NUM_BANKS 4 
 //#ifdef ZERO_BANK_CONFLICTS 
-//#define _DELTA(n) ((n) >> NUM_BANKS + (n) >> (2 * LOG_NUM_BANKS)) 
+//#define _DELTA(n) ((((n) >> NUM_BANKS) + ((n) >> (2 * LOG_NUM_BANKS)))) 
 //#define _DELTA(n) (0) 
 //#else 
-#define _DELTA(n) ((n) >> LOG_NUM_BANKS) 
-#define _D(n) ((n) + _DELTA(n)) 
+#define _DELTA(n) (((n) >> LOG_NUM_BANKS)) 
+#define _D(n) (((n) + _DELTA(n))) 
 //#define _D(n) (n) 
 //#endif
 

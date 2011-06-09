@@ -40,10 +40,10 @@
 #define NUM_BANKS 16 
 #define LOG_NUM_BANKS 4 
 //#ifdef ZERO_BANK_CONFLICTS 
-#define _DELTA(n) ((n) >> NUM_BANKS + (n) >> (2 * LOG_NUM_BANKS)) 
+//#define _DELTA(n) ((n) >> NUM_BANKS + (n) >> (2 * LOG_NUM_BANKS)) 
 //#define _DELTA(n) (0) 
 //#else 
-//#define _DELTA(n) ((n) >> LOG_NUM_BANKS) 
+#define _DELTA(n) ((n) >> LOG_NUM_BANKS) 
 #define _D(n) ((n) + _DELTA(n)) 
 //#define _D(n) (n) 
 //#endif

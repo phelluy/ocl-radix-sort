@@ -24,7 +24,7 @@
 #define TRANSPOSE  // transpose the initial vector (faster memory access)
 //#define PERMUT  // store the final permutation
 ////////////////////////////////////////////////////////
-#define SATISH
+//#define SATISH
 //#define _BITONIC // works only if _BITS == _TOTALBITS !
 
 // the following parameters are computed from the previous

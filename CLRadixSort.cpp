@@ -35,16 +35,22 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
   assert(pow(2,(int) log2(_ITEMS)) == _ITEMS);
 
   // check that the local mem is sufficient (suggestion of Jose Luis Cercós Pita)
-  cl_ulong localMem;
-  clGetDeviceInfo(dev, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(localMem), &localMem, NULL);
+  //cl_ulong localMem;
+  clGetDeviceInfo(dev, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(LocalMemSize), &LocalMemSize, NULL);
   if (VERBOSE) {
-    cout << "Cache size="<<localMem <<" Bytes"<<endl;
+    cout << "Cache size="<<LocalMemSize <<" Bytes"<<endl;
     cout << "Needed cache="<< sizeof(cl_uint)*_RADIX*_ITEMS <<" Bytes"<<endl;
   }
-  assert(localMem > sizeof(cl_uint)*_RADIX*_ITEMS);
+  assert(LocalMemSize > sizeof(cl_uint)*_RADIX*_ITEMS);
 
-  unsigned int maxmemcache=max(_HISTOSPLIT,_ITEMS * _GROUPS * _RADIX / _HISTOSPLIT);
-  assert(localMem > sizeof(cl_uint)*maxmemcache);
+
+  clGetDeviceInfo(dev, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(MaxWorkGroupSize), &MaxWorkGroupSize, NULL);
+
+  unsigned int maxmemcache=max(_HISTOSPLIT+1,_ITEMS * _GROUPS * _RADIX / _HISTOSPLIT + 1);
+  // increase the needed cache in case of bank conflict trick
+  maxmemcache = _D(maxmemcache);
+
+  assert(LocalMemSize > sizeof(cl_uint)*maxmemcache);
 
 
   // init the timers
@@ -122,23 +128,29 @@ CLRadixSort::CLRadixSort(cl_context GPUContext,
   assert(err == CL_SUCCESS);
    
   //Satish
+#ifdef _BITONIC
+  ckSortBlock = clCreateKernel(Program, "sortblock2", &err);
+  assert(err == CL_SUCCESS);
+  cout << "tri bitonic local"<<endl;
+#else
   ckSortBlock = clCreateKernel(Program, "sortblock", &err);
   assert(err == CL_SUCCESS);
-
+  cout << "tri radix local"<<endl;
+#endif
 
   // construction of a random list
   cout << "Construct the random list"<<endl;
-  uint maxint=_MAXINT;
+  int maxint=_MAXINT;
   assert(_MAXINT != 0);
   for(uint i = 0; i < _N; i++){
-    h_Keys[i] = ((rand())% maxint);
+    h_Keys[i] = (rand() % maxint);
     h_checkKeys[i]=h_Keys[i];
   }
 
   //sort each block (for debugging)
-  for(int i=0;i<_N;i+= _BLOCKSIZE){
-    sort(h_Keys+i,h_Keys+i+_BLOCKSIZE);
-  }
+  // for(int i=0;i<_N;i+= _BLOCKSIZE){
+  //   sort(h_Keys+i,h_Keys+i+_BLOCKSIZE);
+  // }
 
   // construction of the initial permutation
   for(uint i = 0; i < _N; i++){
@@ -756,6 +768,7 @@ void CLRadixSort::Histogram(uint pass){
 
   size_t nblocitems=_ITEMS;
   size_t nbitems=_GROUPS*_ITEMS;
+  assert(nblocitems <= MaxWorkGroupSize);
 
   assert(_RADIX == pow(2,_BITS));
 
@@ -817,12 +830,20 @@ void CLRadixSort::ScanHistogram(void){
 
 
   size_t nblocitems= nbitems/_HISTOSPLIT ;
+  assert(nblocitems <= MaxWorkGroupSize);
 
 
   int maxmemcache=max(_HISTOSPLIT+1,(_ITEMS * _GROUPS * _RADIX / _HISTOSPLIT + 1));
 
   // scan locally the histogram (the histogram is split into several
   // parts that fit into the local memory)
+
+  // increase the needed cache in case of bank conflict trick
+  maxmemcache = _D(maxmemcache);
+
+  // check that we have enough memory
+  assert(LocalMemSize > sizeof(cl_uint)*maxmemcache);
+
 
   err = clSetKernelArg(ckScanHistogram, 0, sizeof(cl_mem), &d_Histograms);
   assert(err == CL_SUCCESS);
@@ -873,6 +894,7 @@ void CLRadixSort::ScanHistogram(void){
 
   nbitems= _HISTOSPLIT / 2;
   nblocitems=nbitems;
+  assert(nblocitems <= MaxWorkGroupSize);
 
   err = clEnqueueNDRangeKernel(CommandQueue,
   			       ckScanHistogram,
@@ -904,6 +926,8 @@ void CLRadixSort::ScanHistogram(void){
   // loops again in order to paste together the local histograms
   nbitems = _RADIX* _GROUPS*_ITEMS/2;
   nblocitems=nbitems/_HISTOSPLIT;
+  assert(nblocitems <= MaxWorkGroupSize);
+
 
   err = clEnqueueNDRangeKernel(CommandQueue,
   			       ckPasteHistogram,
@@ -941,11 +965,22 @@ void CLRadixSort::ScanSatish(void){
 
   // numbers of processors for the  scan
   // = half the size of the  histogram
-  size_t nbitems=_RADIX* (_N / _BLOCKSIZE) / 2;
+  size_t nbitems=_RADIX* (_N / _BLOCKSIZE / 2);
   size_t nblocitems= nbitems/_HISTOSPLIT ;
+
+  assert(nblocitems != 0);
+  assert(nblocitems <= MaxWorkGroupSize);
 
 
   int maxmemcache=max(_HISTOSPLIT+1, _RADIX * (_N / _BLOCKSIZE / _HISTOSPLIT) + 1);
+
+  // increase the needed cache in case of bank conflict trick
+  maxmemcache = _D(maxmemcache);
+
+  // check that we have enough memory
+  assert(LocalMemSize > sizeof(cl_uint)*maxmemcache);
+
+
 
   // scan locally the histogram (the histogram is split into several
   // parts that fit into the local memory)
@@ -999,6 +1034,7 @@ void CLRadixSort::ScanSatish(void){
 
   nbitems= _HISTOSPLIT / 2;
   nblocitems=nbitems;
+  assert(nblocitems <= MaxWorkGroupSize);
 
   err = clEnqueueNDRangeKernel(CommandQueue,
   			       ckScanHistogram,
@@ -1030,6 +1066,7 @@ void CLRadixSort::ScanSatish(void){
   // loops again in order to paste together the local histograms
   nbitems=_RADIX* (_N / _BLOCKSIZE) / 2;
   nblocitems= nbitems/_HISTOSPLIT ;
+  assert(nblocitems <= MaxWorkGroupSize);
 
   err = clSetKernelArg(ckPasteHistogram, 0, sizeof(cl_mem), &d_HistoSatish);
   assert(err == CL_SUCCESS);
@@ -1071,6 +1108,7 @@ void CLRadixSort::Reorder(uint pass){
 
   size_t nblocitems=_ITEMS;
   size_t nbitems=_GROUPS*_ITEMS;
+  assert(nblocitems <= MaxWorkGroupSize);
 
 
   clFinish(CommandQueue);
@@ -1156,6 +1194,7 @@ void CLRadixSort::ReorderSatish(uint pass){
 
   size_t nblocitems=_BLOCKSIZE;
   size_t nbitems=_N;
+  assert(nblocitems <= MaxWorkGroupSize);
 
 
   clFinish(CommandQueue);
@@ -1241,6 +1280,9 @@ void CLRadixSort::SortBlocks(uint pass){
 
   size_t nblocitems=_BLOCKSIZE;
   size_t nbitems=_N;
+  assert(nblocitems <= MaxWorkGroupSize);
+
+  int cachesize;
 
   // assert(_RADIX == pow(2,_BITS));
 
@@ -1262,8 +1304,18 @@ void CLRadixSort::SortBlocks(uint pass){
 			NULL); // local cache memory
   assert(err == CL_SUCCESS);
 
+
+  // size of the local histogram
+  cachesize=2 * _BLOCKSIZE+1;
+  // takes into account the bank conflict trick
+  cachesize =_D(cachesize);
+
+  // check that we have enough memory
+  assert(LocalMemSize > sizeof(cl_uint)*cachesize);
+
+
   err  = clSetKernelArg(ckSortBlock, 3,
-			sizeof(uint) * (2 * _BLOCKSIZE+1) ,
+			sizeof(uint) * cachesize ,
 			NULL); // local cache memory
   assert(err == CL_SUCCESS);
 
@@ -1277,6 +1329,11 @@ void CLRadixSort::SortBlocks(uint pass){
   assert(err == CL_SUCCESS);
 
   cl_event eve;
+
+#ifdef _BITONIC
+  nbitems/=2;
+  nblocitems/=2;
+#endif
 
   err = clEnqueueNDRangeKernel(CommandQueue,
 			       ckSortBlock,

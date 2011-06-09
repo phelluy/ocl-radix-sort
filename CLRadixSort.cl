@@ -3,15 +3,12 @@
 // thus we simulate the #include "CLRadixSortParam.hpp" by
 // string manipulations
 
-#define NUM_BANKS 16 
-#define LOG_NUM_BANKS 4 
-#ifdef ZERO_BANK_CONFLICTS 
-#define CONFLICT_FREE_OFFSET(n) \ 
-    ((n) >> NUM_BANKS + (n) >> (2 * LOG_NUM_BANKS)) 
-#else 
-#define CONFLICT_FREE_OFFSET(n) ((n) >> LOG_NUM_BANKS) 
-#endif
 
+__kernel
+void bitonicSortLocal(
+    __local int *l_key,
+    __local int *l_val
+		      );
 
 // compute the histogram for each radix and each virtual processor for the pass
 __kernel void histogram(const __global int* d_Keys,
@@ -199,7 +196,7 @@ void localscan(__local int* temp){
     if (it < d){  
       int ai = decale*(2*it+1)-1;  
       int bi = decale*(2*it+2)-1;  	
-      temp[bi] += temp[ai];  
+      temp[_D(bi)] += temp[_D(ai)];  
     }  
     decale *= 2; 
     //barrier(CLK_LOCAL_MEM_FENCE);  
@@ -209,8 +206,8 @@ void localscan(__local int* temp){
   // (maybe used in the next step for constructing the global scan)
   // clear the last element
   if (it == 0) {
-    temp[n]=temp[n-1];
-    temp[n - 1] = 0;
+    temp[_D(n)]=temp[_D(n-1)];
+    temp[_D(n - 1)] = 0;
   }
                  
   // down sweep phase
@@ -222,9 +219,9 @@ void localscan(__local int* temp){
       int ai = decale*(2*it+1)-1;  
       int bi = decale*(2*it+2)-1;  
          
-      int t = temp[ai];  
-      temp[ai] = temp[bi];  
-      temp[bi] += t;   
+      int t = temp[_D(ai)];  
+      temp[_D(ai)] = temp[_D(bi)];  
+      temp[_D(bi)] += t;   
     }  
     //barrier(CLK_LOCAL_MEM_FENCE);
 
@@ -246,8 +243,8 @@ __kernel void scanhistograms( __global int* histo,__local int* temp,__global int
   int sum;
 
   // load a part of the histogram into local memory
-  temp[2*it] = histo[2*ig];  
-  temp[2*it+1] = histo[2*ig+1];  
+  temp[_D(2*it)] = histo[2*ig];  
+  temp[_D(2*it+1)] = histo[2*ig+1];  
   barrier(CLK_LOCAL_MEM_FENCE);
 
 
@@ -257,12 +254,12 @@ __kernel void scanhistograms( __global int* histo,__local int* temp,__global int
 
   // remember the sum for the next scanning step
   if (it == 0){
-    globsum[gr]=temp[2 * get_local_size(0)];
+    globsum[gr]=temp[_D(2 * get_local_size(0))];
   }
   // write results to device memory
 
-  histo[2*ig] = temp[2*it];  
-  histo[2*ig+1] = temp[2*it+1];  
+  histo[2*ig] = temp[_D(2*it)];  
+  histo[2*ig+1] = temp[_D(2*it+1)];  
 
   barrier(CLK_GLOBAL_MEM_FENCE);
 
@@ -301,52 +298,57 @@ __kernel void sortblock( __global int* keys,   // the keys to be sorted
 
   // sort the local list with a radix=2 sort
   // also called split algorithm
-  // for(int pass=0;pass < _BITS;pass++){
+  for(int pass=0;pass < _BITS;pass++){
     
-  //   // histogram of the pass
-  //   int key,shortkey;
-  //   key=loc_in[it];
-  //   shortkey=(( key >> (gpass * _BITS) ) & (_RADIX-1));
-  //   shortkey=(( shortkey >> pass ) & 1);  // key bit of the pass
-  //   grhisto[shortkey*blocksize+it]=1;     // yes
-  //   grhisto[(1-shortkey)*blocksize+it]=0;  // no
-  //   barrier(CLK_LOCAL_MEM_FENCE);
+    // histogram of the pass
+    int key,shortkey;
+    key=loc_in[it];
+    shortkey=(( key >> (gpass * _BITS) ) & (_RADIX-1));
+    shortkey=(( shortkey >> pass ) & 1);  // key bit of the pass
+    grhisto[_D(shortkey*blocksize+it)]=1;     // yes
+    grhisto[_D((1-shortkey)*blocksize+it)]=0;  // no
+    barrier(CLK_LOCAL_MEM_FENCE);
     
-  //   // scan (exclusive) the local vector
-  //   // grhisto is of size blocksize+1
-  //   // the last value is the total sum
-  //   localscan(grhisto);
+    // scan (exclusive) the local vector
+    // grhisto is of size blocksize+1
+    // the last value is the total sum
+    localscan(grhisto);
     
-  //   // reorder in local memory    
-  //   loc_out[grhisto[shortkey*blocksize+it]] = loc_in[it];  
-  //   barrier(CLK_LOCAL_MEM_FENCE);
+    // reorder in local memory    
+    loc_out[grhisto[_D(shortkey*blocksize+it)]] = loc_in[it];  
+    barrier(CLK_LOCAL_MEM_FENCE);
 
-  //   // exchange old and new keys into local memory
-  //   temp=loc_in;
-  //   loc_in=loc_out;
-  //   loc_out=temp;
+    // exchange old and new keys into local memory
+    temp=loc_in;
+    loc_in=loc_out;
+    loc_out=temp;
 
-  // } // end of split pass
+  } // end of split pass
 
   // now compute the histogram of the group
   // using the ordered keys and the already used
   // local memory
 
+  int key1,key2,shortkey1,shortkey2;
+
   if (it == 0) {
     loc_out[0]=0;
     loc_out[_RADIX]=blocksize;
+    shortkey1=0;
   }
   else {
-    int key1=loc_in[it-1];
-    int key2=loc_in[it];
+    key1=loc_in[it-1];
     //int gpass=0;
-    int shortkey1=(( key1 >> (gpass * _BITS) ) & (_RADIX-1));  // key1 radix
-    int shortkey2=(( key2 >> (gpass * _BITS) ) & (_RADIX-1));  // key2 radix
-    
-    for(int rad=shortkey1;rad<shortkey2;rad++){
-      loc_out[rad+1]=it;
-    }
+    shortkey1=(( key1 >> (gpass * _BITS) ) & (_RADIX-1));  // key1 radix
   }
+   
+  key2=loc_in[it];
+  shortkey2=(( key2 >> (gpass * _BITS) ) & (_RADIX-1));  // key2 radix
+    
+  for(int rad=shortkey1;rad<shortkey2;rad++){
+    loc_out[rad+1]=it;
+  }
+  
   barrier(CLK_LOCAL_MEM_FENCE);
 
   // compute the local histogram
@@ -370,6 +372,94 @@ __kernel void sortblock( __global int* keys,   // the keys to be sorted
     offset[gr *_RADIX + it]=loc_out[it]; // coalesced 
   }
   //barrier(CLK_GLOBAL_MEM_FENCE);
+}  
+
+
+// same as before but with two keys/work-item and a local bitonic sort
+// because the bitonic sort is not stable it works only when
+// _BITS == _TOTALBITS :-(
+__kernel void sortblock2( __global int* keys,   // the keys to be sorted
+			 __local int* loc_in,  // a copy of the keys in local memory
+			 __local int* loc_out,  // a copy of the keys in local memory
+			 __local int* grhisto, // scanned group histogram
+			 __global int* histo,   // not yet scanned global histogram
+			 __global int* offset,   // offset of the radix of each group
+			 const uint gpass)   // # of the pass
+{   
+
+  int it = get_local_id(0);
+  int ig = get_global_id(0);
+  int gr=get_group_id(0);
+  int blocksize=2*get_local_size(0); // see above
+  int sum;
+  __local int* temp; // local pointer for memory exchanges
+
+  // load keys into local memory
+  loc_in[2*it] = keys[2*ig];  
+  loc_in[2*it+1] = keys[2*ig+1];  
+  barrier(CLK_LOCAL_MEM_FENCE);
+
+  // sort the local list with a bitonic local sort
+  bitonicSortLocal(loc_in,loc_out);
+
+  // now compute the histogram of the group
+  // using the ordered keys and the already used
+  // local memory
+
+  int key1,key2,shortkey1,shortkey2;
+
+  if (it == 0) {
+    loc_out[_RADIX]=blocksize;
+    loc_out[0]=0;
+    shortkey1=0;
+  }
+  else{
+    key1=loc_in[2*it-1];
+    shortkey1=(( key1 >> (gpass * _BITS) ) & (_RADIX-1));  // key1 radix
+  }
+  key2=loc_in[2*it];
+  shortkey2=(( key2 >> (gpass * _BITS) ) & (_RADIX-1));  // key2 radix    
+  for(int rad=shortkey1;rad<shortkey2;rad++){
+    loc_out[rad+1]=2*it;
+  }
+  key1=loc_in[2*it];
+  shortkey1=(( key1 >> (gpass * _BITS) ) & (_RADIX-1));  // key1 radix
+  key2=loc_in[2*it+1];
+  shortkey2=(( key2 >> (gpass * _BITS) ) & (_RADIX-1));  // key2 radix    
+  for(int rad=shortkey1;rad<shortkey2;rad++){
+    loc_out[rad+1]=2*it+1;
+  }
+  
+  barrier(CLK_LOCAL_MEM_FENCE);
+
+  // compute the local histogram
+  if (it < _RADIX/2) {
+    grhisto[2*it]=loc_out[2*it+1]-loc_out[2*it];
+    grhisto[2*it+1]=loc_out[2*it+2]-loc_out[2*it+1];
+  }
+  //barrier(CLK_LOCAL_MEM_FENCE);
+  
+  // put the results into global memory
+
+  int key=loc_in[2*it];
+  //int gpass=0;
+  //int shortkey=(( key >> (gpass * _BITS) ) & (_RADIX-1));  // key radix  
+  // the keys
+  keys[2*ig]=loc_in[2*it];
+  key=loc_in[2*it+1];
+  //int gpass=0;
+  //shortkey=(( key >> (gpass * _BITS) ) & (_RADIX-1));  // key radix  
+  // the keys
+  keys[2*ig+1]=loc_in[2*it+1];
+
+  // store the histograms and the offset
+  if (it < _RADIX/2) {
+    histo[2*it *(_N/_BLOCKSIZE)+gr]=grhisto[2*it]; // not coalesced !
+    offset[gr *_RADIX + 2*it]=loc_out[2*it]; // coalesced 
+    histo[(2*it+1) *(_N/_BLOCKSIZE)+gr]=grhisto[2*it+1]; // not coalesced !
+    offset[gr *_RADIX + 2*it+1]=loc_out[2*it+1]; // coalesced 
+  }
+  barrier(CLK_GLOBAL_MEM_FENCE);
 }  
 
 // reorder step of the Satish algorithm
@@ -428,6 +518,106 @@ __kernel void pastehistograms( __global int* histo,const __global int* globsum){
   barrier(CLK_GLOBAL_MEM_FENCE);
 
 }  
+
+//Passed down by clBuildProgram
+#define LOCAL_SIZE_LIMIT _BLOCKSIZE
+
+
+
+// inline void ComparatorPrivate(
+//     uint *keyA,
+//     uint *valA,
+//     uint *keyB,
+//     uint *valB,
+//     uint arrowDir
+// ){
+//     if( (*keyA > *keyB) == arrowDir ){
+//         uint t;
+//         t = *keyA; *keyA = *keyB; *keyB = t;
+//         t = *valA; *valA = *valB; *valB = t;
+//     }
+// }
+
+inline void ComparatorLocal(
+    __local uint *keyA,
+    __local uint *valA,
+    __local uint *keyB,
+    __local uint *valB,
+    uint arrowDir
+){
+    if( (*keyA > *keyB) == arrowDir ){
+        uint t;
+        t = *keyA; *keyA = *keyB; *keyB = t;
+        t = *valA; *valA = *valB; *valB = t;
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Monolithic bitonic sort kernel for short arrays fitting into local memory
+////////////////////////////////////////////////////////////////////////////////
+//__kernel __attribute__((reqd_work_group_size(LOCAL_SIZE_LIMIT / 2, 1, 1)))
+void bitonicSortLocal(
+    __local int *l_key,
+    __local int *l_val
+){
+// void bitonicSortLocal(
+//     __global int *d_DstKey,
+//     __global int *d_DstVal,
+//     __global int *d_SrcKey,
+//     __global int *d_SrcVal,
+//     int arrayLength,
+//     int sortDir
+// ){
+    // __local  int l_key[LOCAL_SIZE_LIMIT];
+    // __local  int l_val[LOCAL_SIZE_LIMIT];
+
+    // //Offset to the beginning of subbatch and load data
+    // d_SrcKey += get_group_id(0) * LOCAL_SIZE_LIMIT + get_local_id(0);
+    // d_SrcVal += get_group_id(0) * LOCAL_SIZE_LIMIT + get_local_id(0);
+    // d_DstKey += get_group_id(0) * LOCAL_SIZE_LIMIT + get_local_id(0);
+    // d_DstVal += get_group_id(0) * LOCAL_SIZE_LIMIT + get_local_id(0);
+    // l_key[get_local_id(0) +                      0] = d_SrcKey[                     0];
+    // l_val[get_local_id(0) +                      0] = d_SrcVal[                     0];
+    // l_key[get_local_id(0) + (LOCAL_SIZE_LIMIT / 2)] = d_SrcKey[(LOCAL_SIZE_LIMIT / 2)];
+    // l_val[get_local_id(0) + (LOCAL_SIZE_LIMIT / 2)] = d_SrcVal[(LOCAL_SIZE_LIMIT / 2)];
+
+  int arrayLength = LOCAL_SIZE_LIMIT;
+  int sortDir=1;  // increasing sort
+
+    for(int size = 2; size < arrayLength; size <<= 1){
+        //Bitonic merge
+        int dir = ( (get_local_id(0) & (size / 2)) != 0 );
+        for(int stride = size / 2; stride > 0; stride >>= 1){
+            barrier(CLK_LOCAL_MEM_FENCE);
+            int pos = 2 * get_local_id(0) - (get_local_id(0) & (stride - 1));
+            ComparatorLocal(
+                &l_key[pos +      0], &l_val[pos +      0],
+                &l_key[pos + stride], &l_val[pos + stride],
+                dir
+            );
+        }
+    }
+
+    //dir == sortDir for the last bitonic merge step
+    {
+        for(int stride = arrayLength / 2; stride > 0; stride >>= 1){
+            barrier(CLK_LOCAL_MEM_FENCE);
+            int pos = 2 * get_local_id(0) - (get_local_id(0) & (stride - 1));
+            ComparatorLocal(
+                &l_key[pos +      0], &l_val[pos +      0],
+                &l_key[pos + stride], &l_val[pos + stride],
+                sortDir
+            );
+        }
+    }
+
+     barrier(CLK_LOCAL_MEM_FENCE);
+    // d_DstKey[                     0] = l_key[get_local_id(0) +                      0];
+    // d_DstVal[                     0] = l_val[get_local_id(0) +                      0];
+    // d_DstKey[(LOCAL_SIZE_LIMIT / 2)] = l_key[get_local_id(0) + (LOCAL_SIZE_LIMIT / 2)];
+    // d_DstVal[(LOCAL_SIZE_LIMIT / 2)] = l_val[get_local_id(0) + (LOCAL_SIZE_LIMIT / 2)];
+}
+
 
 
 

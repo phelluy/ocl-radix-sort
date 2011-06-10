@@ -90,7 +90,7 @@ int main(void){
   }
 
   NumPlatform=NbPlatforms-1;
-  //NumPlatform=0;
+  NumPlatform=0;
   assert(NumPlatform < NbPlatforms);
 
 

@@ -3,6 +3,7 @@
 // thus we simulate the #include "CLRadixSortParam.hpp" by
 // string manipulations
 
+#pragma OPENCL EXTENSION cl_amd_printf : enable
 
 __kernel
 void bitonicSortLocal(
@@ -182,7 +183,7 @@ __kernel void reorder(const __global int* d_inKeys,
 // (the last element contains the total sum)
 // ToDo: the function could be improved by avoiding bank conflicts...  
 
-void localscan2(__local int* temp,int n){
+void localscan(__local int* temp,int n){
 
   int it = get_local_id(0);
   int ig = get_global_id(0);
@@ -232,7 +233,8 @@ void localscan2(__local int* temp,int n){
 // same as before but the size of the vector can of the form
 // n = 2^p0 nw with nw = work group size
 //  p0=1 in the previous algorithm
-void localscan(__local int* temp,int n){
+void localscan2(__local int* temp,int n){
+    barrier(CLK_LOCAL_MEM_FENCE);  
 
   int it = get_local_id(0);
   int ig = get_global_id(0);
@@ -240,37 +242,46 @@ void localscan(__local int* temp,int n){
   int small = n/nw/2;  // small = 2^(p0-1) =2 si p0=2
   for(int i=1;i<small;i++){
     temp[_D(small*it+i)]+=temp[_D(small*it+i-1)];
+    temp[_D(small*it+i+n/2)]+=temp[_D(small*it+i-1+n/2)];
   };
- 	
+  temp[_D(small*it)]=temp[_D(small*it+small-1)];
+  temp[_D(small*it+n/2)]=temp[_D(small*it+small-1+n/2)];
+
+
+
   int decale = small; 
   // parallel prefix sum (algorithm of Blelloch 1990) 
-  for (int d = nw; d > 0; d >>= 1){   
-    barrier(CLK_LOCAL_MEM_FENCE);  
+  barrier(CLK_LOCAL_MEM_FENCE);  
+  for (int d = nw; d >= 1; d >>= 1){   
     if (it < d){  
-      int ai = decale*(2*it+1)-1;  
-      int bi = decale*(2*it+2)-1;  	
+      int ai = decale*(2*it+1)-small;  
+      int bi = decale*(2*it+2)-small;  	
       temp[_D(bi)] += temp[_D(ai)];  
     }  
     decale <<= 1; 
     //barrier(CLK_LOCAL_MEM_FENCE);  
+  barrier(CLK_LOCAL_MEM_FENCE);  
   }
-  
+
+
+
   // store the last element in the global sum vector
   // (maybe used in the next step for constructing the global scan)
   // clear the last element
   if (it == 0) {
-    temp[_D(n)]=temp[_D(n-1)];
-    temp[_D(n - 1)] = 0;
+    temp[_D(n)]=temp[_D(n-small)];
+    temp[_D(n - small)] = 0;
   }
                  
+
   // down sweep phase
-  for (int d = 1; d <= nw; d *= 2){  
+  for (int d = 1; d <= nw; d <<= 1){  
     decale >>= 1;  
     barrier(CLK_LOCAL_MEM_FENCE);
 
     if (it < d){  
-      int ai = decale*(2*it+1)-1;  
-      int bi = decale*(2*it+2)-1;  
+      int ai = decale*(2*it+1)-small;  
+      int bi = decale*(2*it+2)-small;  
          
       int t = temp[_D(ai)];  
       temp[_D(ai)] = temp[_D(bi)];  
@@ -278,12 +289,25 @@ void localscan(__local int* temp,int n){
     }  
     //barrier(CLK_LOCAL_MEM_FENCE);
 
+  }
+
+  barrier(CLK_LOCAL_MEM_FENCE);  
+  printf("resuls=%d\n",it);
+  for(int i=0;i<2*small;i++){
+    printf("%d,%d\n",2*small*it+i,temp[_D(2*small*it+i)]);
   }  
+  barrier(CLK_LOCAL_MEM_FENCE);  
+
+
+  
   barrier(CLK_LOCAL_MEM_FENCE);
+  
   for(int i=small-1;i>0;i--){
     temp[_D(small*it+i)]=temp[_D(small*it+i-1)]+temp[_D(small*it)];
+    temp[_D(small*it+i+n/2)]=temp[_D(small*it+i-1+n/2)]+temp[_D(small*it+n/2)];
   };
-  barrier(CLK_LOCAL_MEM_FENCE);
+
+
 
 }
 
@@ -303,7 +327,6 @@ __kernel void scanhistograms( __global int* histo,__local int* temp,__global int
   temp[_D(2*it)] = histo[2*ig];  
   temp[_D(2*it+1)] = histo[2*ig+1];  
   barrier(CLK_LOCAL_MEM_FENCE);
-
 
   // scan the local vector with
   // the Blelloch's parallel algorithm
@@ -368,8 +391,12 @@ __kernel void sortblock( __global int* keys,   // the keys to be sorted
     shortkey=(( key >> (gpass * _BITS) ) & (_RADIX-1));
     shortkey=(( shortkey >> pass  ) & (_SMALLRADIX-1));  // key bit of the pass
     grhisto[_D(shortkey*blocksize+it)]++;     // yes
-    barrier(CLK_LOCAL_MEM_FENCE);
-    
+    //barrier(CLK_LOCAL_MEM_FENCE);
+    // grhisto[_D(4*it+0)] = 1;  
+    // grhisto[_D(4*it+1)] = 1;  
+    // grhisto[_D(4*it+2)] = 1;  
+    // grhisto[_D(4*it+3)] = 1;  
+
     // scan (exclusive) the local vector
     // grhisto is of size blocksize+1
     // the last value is the total sum

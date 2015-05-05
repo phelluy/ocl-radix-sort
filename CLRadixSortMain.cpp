@@ -21,6 +21,7 @@ int main(void){
   // OpenCL init
 
   cl_device_id* Devices;   // devices array 
+  
 
   char exten[1000]; // list of extensions to opencl language
 
